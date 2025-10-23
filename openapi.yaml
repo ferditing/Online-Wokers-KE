@@ -1,0 +1,764 @@
+openapi: 3.0.3
+info:
+  title: OnlineWorkersKE API
+  version: 1.0.0
+  description: |
+    API contract for OnlineWorkersKE — verified online-only gig marketplace.
+    Core flows: auth, users, jobs, applications, escrow/payments, verification, admin.
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+tags:
+  - name: auth
+    description: Authentication and session
+  - name: users
+    description: User profiles
+  - name: jobs
+    description: Job posting and application flows
+  - name: payments
+    description: Escrow / payments
+  - name: verification
+    description: Verification requests and admin review
+  - name: admin
+    description: Admin-only operations
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      example:
+        message: "Validation failed: email is required."
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [worker, employer, admin]
+        verified:
+          type: boolean
+        phone:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - role
+
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        role:
+          type: string
+          enum: [worker, employer]
+      required:
+        - name
+        - email
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: JWT access token
+      example:
+        user:
+          id: "68ed5658ef349745a13f72b5"
+          name: "Ferdinand"
+          email: "ferd@example.com"
+          role: "worker"
+          verified: false
+          createdAt: "2025-10-01T12:00:00Z"
+        token: "eyJhbGciOiJIU..."
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        employer:
+          $ref: '#/components/schemas/User'
+        budget:
+          type: number
+        currency:
+          type: string
+          example: "KES"
+        status:
+          type: string
+          enum: [open, in_progress, completed, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - description
+        - employer
+        - budget
+
+    JobCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        budget:
+          type: number
+        currency:
+          type: string
+      required:
+        - title
+        - description
+        - budget
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        worker:
+          $ref: '#/components/schemas/User'
+        coverMessage:
+          type: string
+        proposedPrice:
+          type: number
+        status:
+          type: string
+          enum: [applied, accepted, rejected, withdrawn]
+        createdAt:
+          type: string
+          format: date-time
+
+    EscrowTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        employerId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        platformFeePercent:
+          type: number
+          example: 25
+        status:
+          type: string
+          enum: [pending, funded, released, disputed]
+        externalTxId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    EscrowInitiateRequest:
+      type: object
+      properties:
+        jobId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+      required:
+        - jobId
+        - amount
+
+    VerificationRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+          example: "id|qualification"
+        fileUrl:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        comments:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Unauthorized"
+
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Resource not found"
+
+paths:
+
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Login user and receive token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: Get current user (requires Bearer token)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/jobs:
+    get:
+      tags: [jobs]
+      summary: List jobs (pagination & filters)
+      parameters:
+        - name: q
+          in: query
+          description: Search query (title or description)
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open,in_progress,completed,cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [jobs]
+      summary: Create a new job (employer only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Unauthorized'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/jobs/{jobId}:
+    get:
+      tags: [jobs]
+      summary: Get job details
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/jobs/{jobId}/apply:
+    post:
+      tags: [jobs]
+      summary: Worker applies to a job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                coverMessage:
+                  type: string
+                proposedPrice:
+                  type: number
+              required:
+                - coverMessage
+      responses:
+        '201':
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  application:
+                    $ref: '#/components/schemas/Application'
+        '400':
+          $ref: '#/components/responses/Unauthorized'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/jobs/{jobId}/applications/{appId}/accept:
+    patch:
+      tags: [jobs]
+      summary: Employer accepts an application (moves job to in_progress)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: appId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Application accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: '#/components/schemas/Job'
+                  application:
+                    $ref: '#/components/schemas/Application'
+        '403':
+          description: Forbidden (e.g. not employer)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/jobs/{jobId}/applications/{appId}/reject:
+    patch:
+      tags: [jobs]
+      summary: Employer rejects an application
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: appId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Application rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+
+  /api/jobs/{jobId}/submit:
+    post:
+      tags: [jobs]
+      summary: Worker submits deliverable for job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Submission received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  submissionId:
+                    type: string
+
+  /api/payments/escrow/initiate:
+    post:
+      tags: [payments]
+      summary: Create an escrow transaction (employer funds later via Mpesa)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscrowInitiateRequest'
+      responses:
+        '201':
+          description: Escrow transaction created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowTransaction'
+        '400':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/payments/escrow/webhook:
+    post:
+      tags: [payments]
+      summary: Mpesa / payment provider webhook callback (public endpoint)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook received
+
+  /api/payments/escrow/{escrowId}/release:
+    post:
+      tags: [payments]
+      summary: Release escrow funds (admin or authorized employer)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Funds released
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowTransaction'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/escrow/{escrowId}:
+    get:
+      tags: [payments]
+      summary: Get escrow transaction details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Escrow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowTransaction'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/verification/request:
+    post:
+      tags: [verification]
+      summary: Upload verification documents (ID, qualifications)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  example: "id"
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Verification request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+
+  /api/admin/verification:
+    get:
+      tags: [admin, verification]
+      summary: Admin list verification requests (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Pending verification requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VerificationRequest'
+        '403':
+          description: Forbidden
+
+  /api/admin/verification/{id}:
+    patch:
+      tags: [admin, verification]
+      summary: Approve or reject a verification request (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+                comments:
+                  type: string
+      responses:
+        '200':
+          description: Verification updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+        '403':
+          description: Forbidden
+
+  /api/admin/users:
+    get:
+      tags: [admin, users]
+      summary: Admin list users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '403':
+          description: Forbidden
+
+security:
+  - bearerAuth: []
