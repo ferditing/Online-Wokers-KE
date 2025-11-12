@@ -1,34 +1,35 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import Header from './components/Header';
-import Home from './pages/Home';
-import Jobs from './pages/Jobs';
-import JobDetail from './pages/JobDetail';
-import Login from './pages/Auth/Login';
-import Register from './pages/Auth/Register';
-import PostJob from './pages/PostJob';
-import { useAuth } from './context/AuthContext';
-
-const Protected: React.FC<{ children: JSX.Element }> = ({ children }) => {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  return children;
-};
+// src/App.tsx
+import { Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./components/Layout";
+import Home from "./pages/Home";
+import Profile from "./pages/Profile";
+import Jobs from "./pages/Jobs";
+import JobDetail from "./pages/JobDetail";
+import DashboardEntry from "./pages/DashboardEntry";
+import Login from "./pages/Auth/Login";
+import Register from "./pages/Auth/Register";
+import PostJob from "./pages/PostJob";
+import { ProtectedRoute, GuestRoute } from "./components/RouteGuards";
 
 export default function App() {
   return (
-    <div className="app">
-      <Header />
-      <main style={{ padding: 20 }}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/jobs" element={<Jobs />} />
-          <Route path="/jobs/:id" element={<JobDetail />} />
-          <Route path="/post-job" element={<Protected><PostJob /></Protected>} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Routes>
-      </main>
-    </div>
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+        <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+
+        <Route path="/jobs" element={<Jobs />} />
+        <Route path="/jobs/:id" element={<JobDetail />} />
+
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/post-job" element={<ProtectedRoute><PostJob /></ProtectedRoute>} />
+
+        {/* single dashboard entry — chooses admin / employer / worker */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardEntry /></ProtectedRoute>} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Layout>
   );
 }

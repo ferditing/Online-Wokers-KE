@@ -15,7 +15,7 @@ export default function Register() {
     try {
       setErr(null);
       await regFn(data);
-      nav('/jobs');
+      if (data.role === 'worker') nav('/profile'); else nav('/jobs');
     } catch (e: any) {
       setErr(e?.response?.data?.message || 'Registration failed');
     }

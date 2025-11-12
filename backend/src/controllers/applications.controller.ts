@@ -10,6 +10,18 @@ export async function applyToJob(req: Request, res: Response) {
     const jobId = req.params.jobId;
     const workerId = (req as any).userId;
     const { coverMessage, proposedPrice } = req.body;
+
+    // --------- NEW: profile & verification checks ----------
+    // check user profile: must be verified and have 3+ skills
+    const worker = await User.findById(workerId).select('verified skills role');
+    if (!worker) return res.status(404).json({ message: 'User not found' });
+    if (worker.role !== 'worker') return res.status(403).json({ message: 'Only workers can apply' });
+    if (!worker.verified) return res.status(403).json({ message: 'You must be verified before applying' });
+    if (!Array.isArray(worker.skills) || worker.skills.length < 3) {
+      return res.status(400).json({ message: 'Complete your profile with at least 3 skills before applying' });
+    }
+    // -------------------------------------------------------
+
     if (!coverMessage) return res.status(400).json({ message: 'coverMessage is required' });
 
     const job = await Job.findById(jobId);

@@ -1,17 +1,31 @@
-// src/routes/verification.routes.ts
+// backend/src/routes/verification.routes.ts
 import { Router } from 'express';
-import { createVerificationRequest, upload } from '../controllers/verification.controller';
+import multer from 'multer';
+import path from 'path';
+import { uploadVerification, listUserVerifications, getVerification } from '../controllers/verification.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
-import { requireAdmin } from '../middlewares/admin.middleware';
-import * as adminCtrl from '../controllers/admin.controller';
 
 const router = Router();
 
-router.post('/request', requireAuth, upload.single('file'), createVerificationRequest);
+// Use disk storage to keep things simple
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(process.cwd(), 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const name = `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
+    cb(null, name);
+  }
+});
+const upload = multer({ storage });
 
-// admin routes
-router.get('/admin/verification', requireAdmin, adminCtrl.listVerificationRequests);
-router.patch('/admin/verification/:id', requireAdmin, adminCtrl.updateVerificationRequest);
-router.get('/admin/users', requireAdmin, adminCtrl.listUsers);
+// POST /api/verification/request
+router.post('/request', requireAuth, upload.single('file'), uploadVerification);
+
+// GET /api/verification  -> list verifications for current user
+router.get('/', requireAuth, listUserVerifications);
+
+// GET /api/verification/:id
+router.get('/:id', requireAuth, getVerification);
 
 export default router;

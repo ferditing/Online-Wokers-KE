@@ -1,14 +1,27 @@
-body {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-  margin: 0;
-  background: #f7f7fb;
-  color: #111827;
+/* frontend/src/index.css — use the standard Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App-level helper styles */
+:root {
+  --container: 1100px;
 }
-header { background: white; border-bottom: 1px solid #e5e7eb; }
-.container { max-width: 1024px; margin: 0 auto; padding: 12px 20px; }
-button { cursor: pointer; }
-.card { background: white; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03) }
-.input { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; }
-.grid { display: grid; gap: 12px; }
-.flex { display:flex; gap:12px; align-items:center; }
-.small { font-size: 0.9rem; color:#6b7280; }
+
+/* Container helper */
+.container {
+  max-width: var(--container);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* UI helpers */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 font-medium transition;
+}
+.btn-primary { @apply bg-teal-500 text-white hover:bg-teal-600; }
+.card { @apply bg-white border border-gray-200 rounded-lg shadow-sm p-4; }
+.input { @apply border border-gray-300 rounded-md px-3 py-2 w-full; }
+.small { @apply text-sm text-gray-500; }

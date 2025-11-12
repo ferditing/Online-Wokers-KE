@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as authService from '../services/auth.service';
 
@@ -7,6 +8,7 @@ type User = {
   email: string;
   role: string;
   verified?: boolean;
+  skills?: string[];
 };
 
 type AuthContextType = {
@@ -15,6 +17,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>;
   register: (payload: { name: string; email: string; password: string; role?: 'worker'|'employer' }) => Promise<void>;
   logout: () => void;
+  setUserFromResponse?: (u: User | null) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -37,9 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  useEffect(() => {
-    bootstrap();
-  }, []);
+  useEffect(() => { bootstrap(); }, []);
 
   async function login(email: string, password: string) {
     const res = await authService.login({ email, password });
@@ -58,8 +59,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }
 
+  function setUserFromResponse(u: User | null) {
+    setUser(u);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUserFromResponse }}>
       {children}
     </AuthContext.Provider>
   );

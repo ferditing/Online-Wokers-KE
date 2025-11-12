@@ -9,6 +9,9 @@ export interface IUser extends Document {
   phone?: string;
   idNumber?: string;
   qualifications?: { title: string; fileUrl: string }[];
+  skills?: string[];
+  avgRating: number;
+  reviewCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +25,9 @@ const UserSchema = new Schema<IUser>({
   phone: String,
   idNumber: String,
   qualifications: [{ title: String, fileUrl: String }],
+  skills: [{ type: String}],
+  avgRating: { type: Number, default: 0 },
+  reviewCount: { type: Number, default: 0 },
 }, { timestamps: true });
 
 export default model<IUser>('User', UserSchema);

@@ -25,6 +25,17 @@ export default function JobDetail() {
   }, [id]);
 
   async function onApply(data: any) {
+    // client-side checks: backend also enforces verification and minimum skills
+    const userSkills = user?.skills || [];
+    if (!user?.verified) {
+      alert('You must be a verified user before applying to jobs. Please complete verification.');
+      return;
+    }
+    if (userSkills.length < 3) {
+      alert('You need at least 3 skills on your profile to apply. Please add more skills.');
+      return;
+    }
+
     try {
       await applyToJob(id!, data);
       alert('Applied — check dashboard or wait for employer');
@@ -51,6 +62,30 @@ export default function JobDetail() {
         <h3>{job.title}</h3>
         <div className="small">Budget: {job.currency} {job.budget}</div>
         <p style={{ marginTop: 12 }}>{job.description}</p>
+
+        {/* required skills and match indicator */}
+        {(() => {
+          const required: string[] = job.requiredSkills || [];
+          const userSkills: string[] = user?.skills || [];
+          const overlap = required.filter((r: string) => userSkills.includes(r)).length;
+          const isFullMatch = required.length > 0 && overlap >= required.length;
+
+          return (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="text-sm">Required skills:</div>
+              <div className="flex gap-2 flex-wrap">
+                {required.map((r: string) => (
+                  <span key={r} className="text-xs px-2 py-1 bg-gray-100 rounded">{r}</span>
+                ))}
+              </div>
+              <div className="ml-auto text-sm">
+                <span className={`px-2 py-1 rounded text-xs ${isFullMatch ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                  {overlap}/{required.length} match
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {user?.role === 'worker' && (
           <div style={{ marginTop: 16 }}>
