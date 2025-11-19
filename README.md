@@ -165,18 +165,31 @@ For support: **[tingishaferdinand@gmail.com](mailto:tingishaferdinand@gmail.com)
 
 ---
 
-# 📸 Screenshots
+### Landing Page
+![Landing Page](docs/LandingPage.png)
 
-* Landing Page: `docs/LandingPage.png`
-* Employer Dashboard: `docs/EmployerDashboard.png`
-* Employer Post Job: `docs/EmployerPostJOb.png`
-* Employer Profile: `docs/EmployerProile.png`
-* Employer Top Up Escrow: `docs/EmployerTopUpescrow.png`
-* Worker Dashboard: `docs/wokerDasboard.png`
-* Worker Profile: `docs/wokerProfile.png`
-* Worker Request Payout: `docs/wokerRequestPayout.png`
-* Employer Payments: `docs/employerpayments.png`
+### Employer Dashboard
+![Employer Dashboard](docs/EmployerDashboard.png)
 
----
+### Employer Post Job
+![Employer Post Job](docs/EmployerPostJOb.png)
 
-*Generated README — edit the deploy links & env examples as needed.*
+### Employer Profile
+![Employer Profile](docs/EmployerProile.png)
+
+### Employer Top Up Escrow
+![Employer Top Up Escrow](docs/EmployerTopUpescrow.png)
+
+### Worker Dashboard
+![Worker Dashboard](docs/wokerDasboard.png)
+
+### Worker Profile
+![Worker Profile](docs/wokerProfile.png)
+
+### Worker Request Payout
+![Worker Request Payout](docs/wokerRequestPayout.png)
+
+### Employer Payments
+![employer List Escrow Top Ups](docs/employerpayments.png)
+`
+
