@@ -70,7 +70,7 @@ export const payForJob = async (req: Request, res: Response) => {
     });
 
     // initiate STK
-    const stk = await mpesaService.initiateSTKPush(phoneNumber, amount, `Job-${jobId}`, `Payment for job: ${job.title}`);
+    const stk: any = await mpesaService.initiateSTKPush(phoneNumber, amount, `Job-${jobId}`, `Payment for job: ${job.title}`);
 
     // save providerData with canonical and raw keys
     payment.providerData = {
@@ -119,7 +119,7 @@ export const verifyJob = async (req: Request, res: Response) => {
       meta: { phoneNumber, provider: "mpesa" }
     });
 
-    const stk = await mpesaService.initiateSTKPush(phoneNumber, amount, `Job-Verification-${jobId}`, `Job verification for ${job.title}`);
+    const stk: any = await mpesaService.initiateSTKPush(phoneNumber, amount, `Job-Verification-${jobId}`, `Job verification for ${job.title}`);
 
     payment.providerData = {
       ...(payment.providerData || {}),
@@ -151,21 +151,20 @@ export const mpesaCallback = async (req: Request, res: Response) => {
     const stk = body?.stkCallback ?? body;
 
     const checkoutRequestId = getStringId(
-      stk?.CheckoutRequestID ??
-      stk?.checkoutRequestID ??
-      stk?.checkoutRequestId ??
-      stk?.MerchantRequestID ??
+      (stk as any)?.CheckoutRequestID ??
+      (stk as any)?.checkoutRequestID ??
+      (stk as any)?.checkoutRequestId ??
       null
     );
 
     const merchantRequestId = getStringId(
-      stk?.MerchantRequestID ??
-      stk?.merchantRequestID ??
-      stk?.merchantRequestId ??
+      (stk as any)?.MerchantRequestID ??
+      (stk as any)?.merchantRequestID ??
+      (stk as any)?.merchantRequestId ??
       null
     );
 
-    const callbackMeta = parseCallbackMetadata(stk?.CallbackMetadata ?? stk?.callbackMetadata);
+    const callbackMeta = parseCallbackMetadata((stk as any)?.CallbackMetadata ?? (stk as any)?.callbackMetadata);
 
     // try to find payment by various fields (providerData or meta)
     const orClauses: any[] = [];
@@ -206,7 +205,7 @@ export const mpesaCallback = async (req: Request, res: Response) => {
       return res.status(200).json({ message: "Payment not found" });
     }
 
-    const resultCode = stk?.ResultCode ?? stk?.resultCode ?? null;
+    const resultCode = (stk as any)?.ResultCode ?? (stk as any)?.resultCode ?? null;
     const isPaid = Number(resultCode) === 0;
 
     payment.providerData = {
@@ -252,116 +251,5 @@ export const queryStkStatus = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("queryStkStatus error", err);
     return res.status(500).json({ message: "Failed to query STK status", error: err.message });
-  }
-};
-
-/* ---------------------------- releaseEscrowFunds -------------------------- */
-/** POST /api/payments/mpesa/release-escrow/:escrowId */
-export const releaseEscrowFunds = async (req: Request, res: Response) => {
-  try {
-    const { escrowId } = req.params;
-    const userId = (req as any).userId;
-
-    const escrow = await Escrow.findById(escrowId).populate("jobId");
-    if (!escrow) return res.status(404).json({ message: "Escrow not found" });
-
-    const job = escrow.jobId as any;
-    if (job.employer.toString() !== userId) return res.status(403).json({ message: "Only employer can release funds" });
-    if (escrow.status !== "funded") return res.status(400).json({ message: "Escrow is not funded" });
-
-    const platformFee = Math.round((escrow.amount * escrow.platformFeePercent) / 100);
-    const workerAmount = escrow.amount - platformFee;
-
-    // find accepted application for job to get worker
-    const Application = require("../models/Application");
-    const workerApplication = await Application.findOne({ jobId: job._id, status: "accepted" }).populate("worker", "phone");
-    if (!workerApplication) return res.status(404).json({ message: "Worker application not found" });
-
-    const workerPhone = (workerApplication.worker as any).phone;
-    if (!workerPhone) return res.status(400).json({ message: "Worker phone not available" });
-
-    const formatted = mpesaService.normalizePhone(workerPhone);
-
-    // Initiate B2C — placeholder (you must implement B2C properly)
-    const b2c = await mpesaService.initiateB2C(formatted, workerAmount, `Job payment ${job.title}`, `Job-${job._id}`);
-    if (!b2c.success) {
-      // create a payout payment for admin to execute manually / later
-      const payout = await Payment.create({
-        userId: workerApplication.worker._id,
-        jobId: job._id,
-        amount: workerAmount,
-        currency: "KES",
-        type: "release",
-        status: "pending",
-        meta: { escrowId: escrow._id, platformFee, provider: "mpesa", b2cError: b2c.error }
-      });
-      // mark escrow as released in app but keep payout pending (administrative step)
-      escrow.status = "released";
-      await escrow.save();
-      job.status = "completed";
-      await job.save();
-
-      return res.json({ success: false, message: "B2C not executed programmatically; created payout record for manual processing", payout });
-    }
-
-    // If b2c succeeded, create payout record and update statuses
-    const payoutPayment = await Payment.create({
-      userId: workerApplication.worker._id,
-      jobId: job._id,
-      amount: workerAmount,
-      currency: "KES",
-      type: "release",
-      status: "paid",
-      meta: { escrowId: escrow._id, platformFee, provider: "mpesa", b2cResult: b2c }
-    });
-
-    escrow.status = "released";
-    await escrow.save();
-    job.status = "completed";
-    await job.save();
-
-    return res.json({ success: true, message: "Escrow released and worker paid", payout: payoutPayment, platformFee, workerAmount, b2c });
-  } catch (err: any) {
-    console.error("releaseEscrowFunds error", err);
-    return res.status(500).json({ message: "Failed to release escrow funds", error: err.message });
-  }
-};
-
-/* ----------------------------- B2C result/timeouts ------------------------- */
-/** POST /api/payments/mpesa/b2c-result */
-export const b2cResultWebhook = async (req: Request, res: Response) => {
-  try {
-    const resultData = req.body;
-    console.log("B2C Result received", JSON.stringify(resultData, null, 2));
-
-    // Extract conversation ID
-    const ConversationID = resultData?.Result?.ConversationID ?? resultData?.ConversationId ?? null;
-    const ResultCode = resultData?.Result?.ResultCode ?? resultData?.ResultCode ?? null;
-
-    const payment = await Payment.findOne({ "meta.conversationId": ConversationID, type: "release" });
-    if (!payment) {
-      console.error("Payment not found for ConversationID:", ConversationID);
-      return res.status(200).json({ message: "Payment not found" });
-    }
-
-    payment.providerData = { ...(payment.providerData || {}), b2cResult: resultData };
-    payment.status = Number(ResultCode) === 0 ? "paid" : "failed";
-    await payment.save();
-
-    return res.status(200).json({ message: "B2C result processed" });
-  } catch (err: any) {
-    console.error("b2cResultWebhook error", err);
-    return res.status(500).json({ message: "B2C result processing failed", error: err.message });
-  }
-};
-
-/** POST /api/payments/mpesa/b2c-timeout */
-export const b2cTimeoutWebhook = async (req: Request, res: Response) => {
-  try {
-    console.log("B2C Timeout received", JSON.stringify(req.body, null, 2));
-    return res.status(200).json({ message: "B2C timeout noted" });
-  } catch (err: any) {
-    console.error("b2cTimeoutWebhook error", err);
-    return res.status(500).json({ message: "B2C timeout processing failed", error: err.message });
   }
 };

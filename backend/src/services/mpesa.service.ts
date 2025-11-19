@@ -13,7 +13,8 @@ export async function getAccessToken(): Promise<string> {
   const auth = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString("base64");
   const url = `${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`;
   const res = await axios.get(url, { headers: { Authorization: `Basic ${auth}` } });
-  return res.data.access_token;
+  // treat external response as any
+  return (res.data as any).access_token;
 }
 
 /** Generate STK password (BusinessShortCode + Passkey + Timestamp) */
@@ -57,7 +58,8 @@ export async function initiateSTKPush(phone: string, amount: number, accountRefe
     headers: { Authorization: `Bearer ${token}` }
   });
 
-  return res.data;
+  // return raw response body (typed as any)
+  return res.data as any;
 }
 
 /** Query STK Push status */
@@ -77,13 +79,12 @@ export async function querySTKPush(checkoutRequestId: string) {
     headers: { Authorization: `Bearer ${token}` }
   });
 
-  return res.data;
+  return res.data as any;
 }
 
 /** Simple B2C (server-to-customer) helper — note: requires valid credentials & setup */
 export async function initiateB2C(msisdn: string, amount: number, remarks = "", occasion = "") {
   // Implementing a fully robust B2C requires certificate and initiator credentials.
   // Placeholder shows the shape — adapt to your environment and credentials if needed.
-  // For now return a consistent shape consumers expect.
   return { success: false, error: "B2C not implemented in this helper. Wire your B2C flow here." };
 }

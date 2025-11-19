@@ -42,7 +42,7 @@ export const createTopup = async (req: Request, res: Response) => {
     });
 
     // initiate STK
-    const stk = await mpesaService.initiateSTKPush(phoneNumber, amount, `TOPUP-${userId}`, "Wallet topup");
+    const stk: any = await mpesaService.initiateSTKPush(phoneNumber, amount, `TOPUP-${userId}`, "Wallet topup");
 
     // write providerData
     payment.providerData = {
@@ -70,8 +70,6 @@ export const createTopup = async (req: Request, res: Response) => {
 /** POST /api/payments/mpesa/callback (used earlier by mpesa.controller, kept for compatibility) */
 export const confirmTopupWebhook = async (req: Request, res: Response) => {
   try {
-    // This function can be used if you prefer payments.controller to handle some callbacks.
-    // We keep it to satisfy the original route assertions; but your main mpesaCallback handles STK callbacks.
     await WebhookLog.create({ receivedAt: new Date(), source: "mpesa", event: "confirmTopupWebhook", payload: req.body });
     return res.status(200).json({ message: "ok" });
   } catch (err: any) {
