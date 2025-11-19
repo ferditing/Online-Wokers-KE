@@ -14,6 +14,8 @@
   "type": "commonjs",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.908.0",
+    "@types/socket.io": "^3.0.1",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "bullmq": "^5.61.0",
     "cors": "^2.8.5",
@@ -27,6 +29,7 @@
     "mongoose": "^8.19.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "socket.io": "^4.8.1",
     "winston": "^3.18.3"
   },
   "devDependencies": {
@@ -36,7 +39,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.0.0",
-    "@types/node": "^24.7.1",
+    "@types/node": "^24.10.1",
     "@types/supertest": "^6.0.3",
     "eslint": "^9.37.0",
     "jest": "^30.2.0",

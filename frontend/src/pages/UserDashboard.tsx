@@ -1,303 +1,347 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
 import { Link } from "react-router-dom";
+import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
 
 /**
- * UserDashboard.tsx
- * - Employer: shows jobs (employer's) and per-job applicants (fetched on demand).
- * - Worker: shows suggested jobs + own applications.
- *
- * Server endpoints expected:
- * GET  /jobs?employer=<id>&limit=50                 -> { jobs: Job[] } OR Job[]
- * GET  /jobs?limit=50                                -> { jobs: Job[] } OR Job[]
- * GET  /applications?worker=<id>                     -> { applications: Application[] } OR Application[]
- * GET  /jobs/:id/applications                        -> { applications: Application[] }
- * PATCH /applications/:id/accept                      -> { ok: true, application }
- * PATCH /applications/:id/reject                      -> { ok: true, application }
+ * UserDashboard
+ * - Employer: lists jobs posted by them and allows fetching applicants per job
+ * - Worker: lists their applications and suggested jobs (with match visible)
+ * - Robustly waits for auth before making requests (avoids worker=undefined)
  */
 
-type Job = {
-  _id: string;
-  title: string;
-  description?: string;
-  status?: string;
-  budget?: number;
-  currency?: string;
-  requiredSkills?: string[];
-  assignedWorker?: any | string;
-  createdAt?: string;
-};
-
-type Application = {
-  _id: string;
-  job: Job | string;
-  worker?: any; // populated worker object: { _id, name, email, skills: string[] }
-  coverMessage?: string;
-  proposedPrice?: number;
-  status?: string; // pending, accepted, rejected
-  createdAt?: string;
-};
+type Job = any;
+type Application = any;
 
 export default function UserDashboard() {
-  const { user } = useAuth() as any;
-
-  // shared state
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // employer state
+  const { user, loading: authLoading, refreshUser } = useAuth() as any;
+  const [loading, setLoading] = useState<boolean>(true);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [applicantsMap, setApplicantsMap] = useState<Record<string, Application[]>>({});
   const [applicantsLoading, setApplicantsLoading] = useState<Record<string, boolean>>({});
+  const [submissionsMap, setSubmissionsMap] = useState<Record<string, Application[]>>({});
+  const [submissionsLoading, setSubmissionsLoading] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
 
-  // applicant filter state (employer)
-  const [applicantSkillQuery, setApplicantSkillQuery] = useState<string>("");
-
-  // worker state
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [suggestedJobs, setSuggestedJobs] = useState<Job[]>([]);
-
-  // fetch role-specific data
+  // load once user is available
   useEffect(() => {
     let mounted = true;
     async function load() {
+      // wait for auth to finish
+      if (authLoading) return;
+      if (!user) { // not signed in
+        setJobs([]); setApplications([]); setLoading(false); return;
+      }
+
       setLoading(true);
       setError(null);
       try {
-        if (!user) return;
-
+        const uid = user.id || user._id || user._idStr || user._id?.toString();
         if (user.role === "employer") {
-          // fetch only this employer's jobs
-          const res = await api.get(`/jobs?employer=${user.id}&limit=50`);
-          const jobsData = res.data?.jobs ?? res.data ?? [];
+          // fetch jobs filtered by employer
+          const res = await api.get(`/jobs?employer=${uid}&limit=50`).catch(() => ({ data: [] }));
+          const jobsData = res.data?.jobs ?? (Array.isArray(res.data) ? res.data : []);
           if (!mounted) return;
           setJobs(jobsData);
         } else {
-          // worker: fetch suggested jobs and the worker's applications
-          const [jobsRes, appsRes] = await Promise.all([
-            api.get(`/jobs?limit=50`),
-            api.get(`/applications?worker=${user.id}`)
+          // worker: fetch own applications and suggested jobs
+          const [appsRes, jobsRes] = await Promise.all([
+            api.get(`/applications?worker=${uid}`).catch((err) => {
+              if (err?.response?.status === 404) return { data: [] };
+              throw err;
+            }),
+            api.get(`/jobs?limit=50`).catch(() => ({ data: [] }))
           ]);
-          const jobsData = jobsRes.data?.jobs ?? jobsRes.data ?? [];
-          const appsData = appsRes.data?.applications ?? appsRes.data ?? [];
-          if (!mounted) {
-            return;
-          }
-          // suggested: we can sort by matching skills client-side for now
-          setSuggestedJobs(jobsData);
+
+          const appsData = appsRes.data?.applications ?? (Array.isArray(appsRes.data) ? appsRes.data : []);
+          const jobsData = jobsRes.data?.jobs ?? (Array.isArray(jobsRes.data) ? jobsRes.data : []);
+          if (!mounted) return;
           setApplications(appsData);
+          // optionally compute match score on client; backend can also return it
+          setJobs(jobsData.slice(0, 20));
         }
       } catch (err: any) {
-        console.error(err);
-        if (mounted) setError(err?.response?.data?.message || "Failed to load dashboard data");
+        console.error("dashboard load error", err);
+        if (mounted) setError(err?.response?.data?.message || "Failed to load dashboard");
       } finally {
         if (mounted) setLoading(false);
       }
     }
+
     load();
     return () => { mounted = false; };
-  }, [user]);
+  }, [authLoading, user]);
 
-  // helper to fetch applicants for a job on demand (employer)
-  async function fetchApplicantsForJob(jobId: string) {
-    // already fetched?
-    if (applicantsMap[jobId]) {
-      setSelectedJobId(jobId);
-      return;
-    }
+  // fetch applicants for a job (employer view)
+  async function fetchApplicants(jobId: string) {
+    if (applicantsMap[jobId]) return; // cached
     setApplicantsLoading(prev => ({ ...prev, [jobId]: true }));
     try {
       const res = await api.get(`/jobs/${jobId}/applications`);
       const apps = res.data?.applications ?? res.data ?? [];
       setApplicantsMap(prev => ({ ...prev, [jobId]: apps }));
-      setSelectedJobId(jobId);
-    } catch (err) {
-      console.error(err);
-      setError("Could not fetch applicants");
+    } catch (err: any) {
+      console.error("fetchApplicants", err);
+      setError(err?.response?.data?.message || "Could not fetch applicants");
     } finally {
       setApplicantsLoading(prev => ({ ...prev, [jobId]: false }));
     }
   }
 
-  // accept/reject application (employer)
-  async function updateApplicationStatus(appId: string, newStatus: "accepted" | "rejected") {
+  // fetch submissions for a job (employer view)
+  async function fetchSubmissions(jobId: string) {
+    if (submissionsMap[jobId]) return; // cached
+    setSubmissionsLoading(prev => ({ ...prev, [jobId]: true }));
     try {
-      // Optimistic UI: update applicantsMap immediately
-      const updatedMap = { ...applicantsMap };
-      for (const jobId of Object.keys(updatedMap)) {
-        updatedMap[jobId] = updatedMap[jobId].map(a => a._id === appId ? { ...a, status: newStatus } : a);
-      }
-      setApplicantsMap(updatedMap);
-
-      await api.patch(`/applications/${appId}`, { status: newStatus });
-      // backend should handle job assignment when accepting
-    } catch (err) {
-      console.error(err);
-      setError("Could not update application status");
-      // Ideally re-fetch the applicant list for consistency
+      const res = await api.get(`/applications?jobId=${jobId}&status=accepted`);
+      const apps = res.data?.applications ?? res.data ?? [];
+      setSubmissionsMap(prev => ({ ...prev, [jobId]: apps }));
+    } catch (err: any) {
+      console.error("fetchSubmissions", err);
+      setError(err?.response?.data?.message || "Could not fetch submissions");
+    } finally {
+      setSubmissionsLoading(prev => ({ ...prev, [jobId]: false }));
     }
   }
 
-  // filter applicants by skill (case-insensitive substring match on skills)
-  function filterApplicantsBySkill(apps: Application[], q: string) {
-    if (!q || q.trim() === "") return apps;
-    const qLower = q.trim().toLowerCase();
-    return apps.filter(a => {
-      const skills: string[] = (a.worker && a.worker.skills) || [];
-      return skills.some(s => s.toLowerCase().includes(qLower));
-    });
+  async function changeApplicationStatus(appId: string, status: "accepted" | "rejected") {
+    try {
+      await api.patch(`/applications/${appId}`, { status });
+      // update local map
+      setApplicantsMap(prev => {
+        const newMap = { ...prev };
+        for (const jobId in newMap) {
+          newMap[jobId] = newMap[jobId].map((a: any) => a._id === appId ? { ...a, status } : a);
+        }
+        return newMap;
+      });
+      // if accepted -> refresh user (in case that toggles verified/assignments)
+      if (status === "accepted") {
+        await refreshUser().catch(() => {});
+      }
+    } catch (err) {
+      console.error("changeApplicationStatus", err);
+      setError("Could not update application");
+    }
   }
 
-  // For workers: compute match score (overlap) between job.requiredSkills and user.skills
-  function jobMatchScore(job: Job) {
-    const userSkills: string[] = user?.skills ?? [];
-    const required: string[] = job.requiredSkills ?? [];
-    if (required.length === 0) return 0;
-    const overlap = required.filter(r => userSkills.includes(r)).length;
-    return Math.round((overlap / required.length) * 100); // percent match
+  async function approveSubmission(appId: string) {
+    try {
+      await api.patch(`/applications/${appId}/approve-submission`, {});
+      // update local submissions map
+      setSubmissionsMap(prev => {
+        const newMap = { ...prev };
+        for (const jobId in newMap) {
+          newMap[jobId] = newMap[jobId].map((a: any) => a._id === appId ? { ...a, submission: { ...a.submission, approvedAt: new Date().toISOString() } } : a);
+        }
+        return newMap;
+      });
+    } catch (err) {
+      console.error("approveSubmission", err);
+      setError("Could not approve submission");
+    }
   }
 
-  // UI: quick components
-  function JobCard({ job, onViewApplicants }: { job: Job; onViewApplicants?: (id: string) => void }) {
-    const match = user?.role !== "employer" ? jobMatchScore(job) : undefined;
-    return (
-      <div className="card p-3 flex items-start justify-between">
-        <div>
-          <div className="font-medium">{job.title}</div>
-          <div className="text-xs text-gray-500 mt-1">{job.requiredSkills?.slice(0,3).join(", ") || "No skills listed"}</div>
-          <div className="text-xs text-gray-400 mt-2">{job.description ? job.description.slice(0,120) : ""}</div>
-        </div>
+  const stats = useMemo(() => {
+    if (!user) return {};
+    if (user.role === "employer") {
+      return { posted: jobs.length, applicantsWaiting: Object.values(applicantsMap).flat().filter(a => a.status === "pending").length };
+    }
+    return { applied: applications.length, openJobs: jobs.filter(j => j.status === "open").length };
+  }, [user, jobs, applications, applicantsMap]);
 
-        <div className="text-right flex flex-col items-end gap-2">
-          <div className="text-sm font-semibold">{job.currency || "KES"} {job.budget ?? "—"}</div>
-          {user?.role === "employer" ? (
-            <div className="flex gap-2">
-              <button className="text-sm text-blue-600" onClick={() => onViewApplicants && onViewApplicants(job._id)}>
-                View applicants
-              </button>
-              <Link to={`/jobs/${job._id}`} className="text-sm text-gray-600">Details</Link>
-            </div>
-          ) : (
-            <div className="text-xs">
-              <div className={`inline-block px-2 py-1 rounded text-xs ${match! >= 70 ? "bg-green-100 text-green-800" : match! >= 40 ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-700"}`}>
-                {match}% match
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function ApplicantRow({ a }: { a: Application }) {
-    const skills = (a.worker && a.worker.skills) || [];
-    return (
-      <div className="border rounded p-3 flex items-start justify-between bg-white">
-        <div>
-          <div className="font-medium">{a.worker?.name ?? "Worker"}</div>
-          <div className="text-xs text-gray-500">{a.worker?.email}</div>
-          <div className="text-xs text-gray-500 mt-2">{a.coverMessage}</div>
-          <div className="text-xs text-gray-400 mt-2">Skills: {skills.slice(0,6).join(", ") || "—"}</div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="text-sm font-semibold">{a.proposedPrice ?? "—"}</div>
-          <div className="flex gap-2">
-            {a.status !== "accepted" && <button className="px-2 py-1 rounded bg-green-100 text-green-800 text-sm" onClick={() => updateApplicationStatus(a._id, "accepted")}>Accept</button>}
-            {a.status !== "rejected" && <button className="px-2 py-1 rounded bg-red-100 text-red-800 text-sm" onClick={() => updateApplicationStatus(a._id, "rejected")}>Reject</button>}
-            <Link to={`/profile/${a.worker?._id}`} className="text-sm text-blue-600">View profile</Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // computed UI states
-  const selectedApplicants = selectedJobId ? (applicantsMap[selectedJobId] ?? []) : [];
-
-  if (!user) return <div className="container py-8">Please sign in</div>;
-  if (loading) return <div className="container py-8">Loading...</div>;
+  if (authLoading || loading) return <div className="container py-8">Loading dashboard…</div>;
+  if (!user) return <div className="container py-8">Please sign in to view your dashboard</div>;
+  if (error) return <div className="container py-8 text-red-600">{error}</div>;
 
   return (
-    <div className="container py-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="container mx-auto py-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Welcome back, {user.name}</h1>
-          <p className="text-sm text-gray-500">{user.role === "employer" ? "Manage your job posts and applicants" : "Browse jobs and track your applications"}</p>
+          <h2 className="text-2xl font-semibold">Welcome back, {user.name}</h2>
+          <p className="text-sm text-slate-500 mt-1">{user.role === "employer" ? "Manage your jobs & applicants" : "Track your applications & discover jobs"}</p>
         </div>
-        <div>
-          {user.role === "employer" ? <Link to="/post-job" className="btn btn-primary">Post new job</Link> : <Link to="/jobs" className="btn btn-primary">Find jobs</Link>}
+        <div className="flex gap-3">
+          {user.role === "employer" ? <Link to="/post-job" className="px-3 py-2 bg-violet-600 text-white rounded-md">Post job</Link> : <Link to="/jobs" className="px-3 py-2 border rounded-md">Browse jobs</Link>}
         </div>
       </div>
 
-      {user.role === "employer" ? (
-        <>
-          <h2 className="text-lg font-medium mb-3">Your jobs</h2>
-          <div className="grid gap-3">
-            {jobs.length === 0 ? <div className="card">No jobs posted yet</div> : jobs.map(j => (
-              <div key={j._id} className="card flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{j.title}</div>
-                  <div className="text-xs text-gray-500">{j.requiredSkills?.join(", ")}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button className="text-sm text-blue-600" onClick={() => fetchApplicantsForJob(j._id)}>
-                    {applicantsLoading[j._id] ? "Loading..." : "View applicants"}
-                  </button>
-                  <Link to={`/jobs/${j._id}`} className="text-sm text-gray-600">Details</Link>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <div className="text-sm text-slate-500">Primary</div>
+          <div className="text-2xl font-semibold mt-2">{user.role === "employer" ? stats.posted : stats.applied}</div>
+        </Card>
 
-          {/* applicants panel */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium">Applicants</h3>
-              <div className="flex items-center gap-2">
-                <input placeholder="Filter by skill (e.g. Python)" value={applicantSkillQuery} onChange={e => setApplicantSkillQuery(e.target.value)} className="input" />
-                <button className="text-sm text-gray-500" onClick={() => { setApplicantSkillQuery(""); }}>Clear</button>
-                <button className="text-sm text-gray-500" onClick={() => setSelectedJobId(null)}>Close</button>
-              </div>
+        <Card>
+          <div className="text-sm text-slate-500">Secondary</div>
+          <div className="text-2xl font-semibold mt-2">{user.role === "employer" ? stats.applicantsWaiting : stats.openJobs}</div>
+        </Card>
+
+        <Card>
+          <div className="text-sm text-slate-500">Profile</div>
+          <div className="mt-2">
+            <div className={`inline-block px-2 py-1 rounded text-sm ${user.verified ? "bg-cyan-100 text-cyan-700" : "bg-amber-100 text-amber-700"}`}>
+              {user.verified ? "Verified" : "Not verified"}
             </div>
+          </div>
+        </Card>
+      </div>
 
-            {!selectedJobId ? (
-              <div className="text-sm text-gray-500">Select a job to view applicants</div>
-            ) : (
-              <div>
-                {(selectedApplicants.length === 0) ? (
-                  <div className="card">No applicants yet for this job</div>
-                ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <h3 className="text-lg font-medium mb-3">{user.role === "employer" ? "Your jobs" : "Suggested jobs"}</h3>
+
+            {user.role === "employer" ? (
+              <>
+                {jobs.length === 0 ? <div className="text-sm text-slate-500">You have not posted jobs yet</div> : (
                   <div className="space-y-3">
-                    {filterApplicantsBySkill(selectedApplicants, applicantSkillQuery).map(a => <ApplicantRow key={a._id} a={a} />)}
+                    {jobs.map((j: Job) => (
+                      <div key={j._id} className="flex items-center justify-between p-3 border rounded bg-white">
+                        <div>
+                          <div className="font-medium">{j.title}</div>
+                          <div className="text-xs text-slate-500">{(j.requiredSkills || []).slice(0,5).join(", ")}</div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button onClick={() => fetchApplicants(j._id)} className="text-sm">
+                            {applicantsLoading[j._id] ? "Loading..." : "View applicants"}
+                          </Button>
+                          {j.status === "in_progress" && (
+                            <Button onClick={() => fetchSubmissions(j._id)} className="text-sm">
+                              {submissionsLoading[j._id] ? "Loading..." : "View submissions"}
+                            </Button>
+                          )}
+                          <Link to={`/jobs/${j._id}`} className="text-sm text-slate-600">Details</Link>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
+              </>
+            ) : (
+              <>
+                {jobs.length === 0 ? <div className="text-sm text-slate-500">No jobs found</div> : (
+                  <div className="space-y-3">
+                    {jobs.map((j: Job) => {
+                      // compute a simple match score for display (client-side)
+                      const required = Array.isArray(j.requiredSkills) ? j.requiredSkills : [];
+                      const userSkills = Array.isArray(user.skills) ? user.skills : [];
+                      const overlap = required.filter((r: string) => userSkills.includes(r)).length;
+                      return (
+                        <div key={j._id} className="flex items-center justify-between p-3 border rounded bg-white">
+                          <div>
+                            <div className="font-medium">{j.title}</div>
+                            <div className="text-xs text-slate-500">{required.slice(0,5).join(", ")}</div>
+                            <div className="text-xs text-slate-400 mt-1">{overlap}/{required.length} match</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold">{j.currency || "KES"} {j.budget ?? "—"}</div>
+                            <Link to={`/jobs/${j._id}`} className="text-sm text-slate-600">View / Apply</Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
-          </div>
-        </>
-      ) : (
-        <>
-          <h2 className="text-lg font-medium mb-3">Suggested jobs for you</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {suggestedJobs.length === 0 ? <div className="card">No jobs available</div> : suggestedJobs.map(j => <JobCard key={j._id} job={j} />)}
-          </div>
+          </Card>
 
-          <h3 className="text-lg font-medium mt-6 mb-3">Your applications</h3>
-          <div className="space-y-3">
-            {applications.length === 0 ? <div className="card">You haven't applied to any jobs yet</div> : applications.map(a => (
-              <div key={a._id} className="card flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{typeof a.job === "object" ? (a.job as Job).title : String(a.job)}</div>
-                  <div className="text-xs text-gray-500">{a.coverMessage}</div>
-                </div>
-                <div className="text-sm text-gray-500">{a.status}</div>
+          {/* applicants lists for employer (render one card per job that has applicants loaded) */}
+          {Object.entries(applicantsMap).map(([jobId, apps]) => (
+            <Card key={jobId}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-medium">Applicants</div>
+                <div className="text-xs text-slate-500">Job ID: {jobId}</div>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+
+              <div className="space-y-3">
+                {apps.length === 0 ? <div className="text-sm text-slate-500">No applicants yet</div> : apps.map((a: any) => (
+                  <div key={a._id} className="flex items-start justify-between p-3 border rounded bg-white">
+                    <div>
+                      <div className="font-medium">{a.worker?.name ?? "Worker"}</div>
+                      <div className="text-xs text-slate-500">{a.coverMessage}</div>
+                      <div className="text-xs text-slate-500 mt-1">Skills: {(a.worker?.skills || []).slice(0,5).join(", ")}</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="text-sm">{a.proposedPrice ?? "—"}</div>
+                      <div className="flex gap-2">
+                        {a.status !== "accepted" && <Button onClick={() => changeApplicationStatus(a._id, "accepted")} className="bg-cyan-600 text-white px-3 py-1 rounded">Accept</Button>}
+                        {a.status !== "rejected" && <Button onClick={() => changeApplicationStatus(a._id, "rejected")} className="bg-rose-100 text-rose-700 px-3 py-1 rounded">Reject</Button>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+
+          {/* submissions lists for employer (render one card per job that has submissions loaded) */}
+          {Object.entries(submissionsMap).map(([jobId, apps]) => (
+            <Card key={`submissions-${jobId}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-medium">Submissions</div>
+                <div className="text-xs text-slate-500">Job ID: {jobId}</div>
+              </div>
+
+              <div className="space-y-3">
+                {apps.length === 0 ? <div className="text-sm text-slate-500">No submissions yet</div> : apps.map((a: any) => (
+                  <div key={a._id} className="flex items-start justify-between p-3 border rounded bg-white">
+                    <div>
+                      <div className="font-medium">{a.worker?.name ?? "Worker"}</div>
+                      <div className="text-xs text-slate-500">Submitted: {a.submission?.submittedAt ? new Date(a.submission.submittedAt).toLocaleDateString() : "N/A"}</div>
+                      <div className="text-xs text-slate-500 mt-1">Notes: {a.submission?.notes || "No notes"}</div>
+                      <div className="text-xs text-slate-500 mt-1">Files: {Array.isArray(a.submission?.files) ? a.submission.files.length : 0} files</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="text-sm">Status: {a.submission?.approvedAt ? "Approved" : "Pending"}</div>
+                      {!a.submission?.approvedAt && (
+                        <Button onClick={() => approveSubmission(a._id)} className="bg-green-600 text-white px-3 py-1 rounded">Approve</Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <aside className="space-y-4">
+          <Card>
+            <h4 className="text-sm text-slate-500">Profile</h4>
+            <div className="mt-3">
+              <div className="font-medium">{user.name}</div>
+              <div className="text-xs text-slate-500">{user.email}</div>
+              <div className="mt-2 text-xs text-slate-500">Role: {user.role}</div>
+              <div className="mt-2 text-xs">Skills: {(user.skills || []).slice(0,6).join(", ") || "—"}</div>
+              <div className="mt-3">
+                <Link to="/profile" className="text-sm text-violet-600">Edit profile</Link>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <h4 className="text-sm text-slate-500">Quick actions</h4>
+            <div className="mt-3 flex flex-col gap-2">
+              {user.role === "employer" ? (
+                <>
+                  <Link to="/post-job" className="text-sm text-violet-600">Post a new job</Link>
+                  <Link to="/admin/verifications" className="text-sm text-violet-600">Review verifications</Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/jobs" className="text-sm text-violet-600">Browse jobs</Link>
+                  <Link to="/profile" className="text-sm text-violet-600">Upload verification</Link>
+                </>
+              )}
+            </div>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }

@@ -1,42 +1,48 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState } from "react";
+import api from "../../services/api";
+import { useNavigate, useLocation } from "react-router-dom";
+import Button from "../../components/ui/Button";
 
-type Form = { name: string; email: string; password: string; role?: 'worker'|'employer' };
+export default function Register(){
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("worker");
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const redirect = new URLSearchParams(location.search).get("next") || "/";
 
-export default function Register() {
-  const { register: regFn } = useAuth();
-  const { register, handleSubmit } = useForm<Form>({ defaultValues: { role: 'worker' } });
-  const nav = useNavigate();
-  const [err, setErr] = React.useState<string | null>(null);
-
-  async function onSubmit(data: Form) {
+  async function submit(e: React.FormEvent){
+    e.preventDefault();
+    setBusy(true);
     try {
-      setErr(null);
-      await regFn(data);
-      if (data.role === 'worker') nav('/profile'); else nav('/jobs');
-    } catch (e: any) {
-      setErr(e?.response?.data?.message || 'Registration failed');
-    }
+      await api.post("/auth/register", { name, email, password, role });
+      alert("Registered. Please log in.");
+      navigate("/login");
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Registration failed");
+    } finally { setBusy(false); }
   }
 
   return (
-    <div className="container" style={{ maxWidth: 480 }}>
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3>Register</h3>
-        {err && <div style={{ color: 'red' }}>{err}</div>}
-        <form onSubmit={handleSubmit(onSubmit)} className="grid">
-          <input className="input" placeholder="Full name" {...register('name')} />
-          <input className="input" placeholder="Email" {...register('email')} />
-          <input className="input" type="password" placeholder="Password" {...register('password')} />
-          <select {...register('role')} className="input">
-            <option value="worker">Worker (apply to jobs)</option>
-            <option value="employer">Employer (post jobs)</option>
-          </select>
-          <button type="submit">Create account</button>
-        </form>
-      </div>
+    <div className="min-h-[70vh] flex items-center justify-center">
+      <form onSubmit={submit} className="w-full max-w-md p-8 bg-white rounded-lg shadow">
+        <h2 className="text-2xl font-semibold text-violet-600 mb-4">Create your account</h2>
+        <label className="block text-sm">Full name</label>
+        <input className="input mt-1 mb-2" value={name} onChange={e=>setName(e.target.value)} />
+        <label className="block text-sm">Email</label>
+        <input className="input mt-1 mb-2" value={email} onChange={e=>setEmail(e.target.value)} />
+        <label className="block text-sm">Password</label>
+        <input type="password" className="input mt-1 mb-2" value={password} onChange={e=>setPassword(e.target.value)} />
+        <label className="block text-sm mt-2">Role</label>
+        <select className="input mt-1 mb-4" value={role} onChange={e=>setRole(e.target.value)}>
+          <option value="worker">Worker</option>
+          <option value="employer">Employer</option>
+        </select>
+        <Button className="bg-violet-600 text-white w-full" type="submit" disabled={busy}>{busy ? "Creating..." : "Create account"}</Button>
+        <div className="text-sm text-center mt-4">Already have an account? <a href="/login" className="text-violet-600">Sign in</a></div>
+      </form>
     </div>
   );
 }

@@ -1,146 +1,189 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-
-const SidebarLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => {
-  const loc = useLocation();
-  const active = loc.pathname === to;
-  return (
-    <Link
-      to={to}
-      className={`block px-3 py-2 rounded-md text-sm font-medium ${
-        active ? 'bg-teal-500 text-white' : 'text-gray-700 hover:bg-gray-100'
-      }`}
-    >
-      {children}
-    </Link>
-  );
-};
+// frontend/src/components/Layout.tsx
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
+import NotificationDropdown from "./NotificationDropdown";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth() as any;
   const [open, setOpen] = useState(false);
-  const [isLarge, setIsLarge] = useState(window.innerWidth >= 768);
+  const [isLarge, setIsLarge] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : true);
+  const location = useLocation();
+
+  // constants - keep in sync with CSS margin
+  const SIDEBAR_WIDTH_PX = 224; // 14rem
+  const SIDEBAR_CLASS = "w-56"; // tailwind width to match 14rem
+  const MAIN_MARGIN_CLASS = "md:ml-56";
 
   useEffect(() => {
-    function handleResize() {
-      const large = window.innerWidth >= 768;
-      setIsLarge(large);
-      setOpen(large); // always open on large screens
+    function onResize() {
+      const lg = window.innerWidth >= 768;
+      setIsLarge(lg);
+      setOpen(lg);
     }
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", onResize);
+    onResize();
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const closeSidebar = () => {
+  // close sidebar on navigation (mobile only)
+  useEffect(() => {
+    if (!isLarge) setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const close = () => {
     if (!isLarge) setOpen(false);
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50 relative">
-      {/* Overlay for mobile */}
-      {!isLarge && open && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-20 md:hidden"
-          onClick={closeSidebar}
-        ></div>
-      )}
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setOpen((v) => !v)} className="md:hidden p-1 rounded-md text-violet-600 hover:bg-violet-50">
+              {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+            </button>
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 transform bg-white border-r shadow-sm transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0 md:static`}
-      >
-        <div className="h-full flex flex-col">
-          {/* Header + close button (mobile only) */}
-          <div className="flex items-center justify-between px-6 py-4 border-b md:justify-center">
-            <Link to="/" className="text-xl font-bold text-primary" onClick={closeSidebar}>
+            <Link to="/" className="text-xl font-bold text-violet-600">
               OnlineWorkersKE
             </Link>
-            {!isLarge && (
-              <button
-                onClick={closeSidebar}
-                aria-label="Close sidebar"
-                className="text-gray-700 hover:text-red-600 md:hidden"
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            )}
           </div>
 
-          {/* Navigation */}
-          <nav className="p-4 flex-1 space-y-1 overflow-auto">
-            <SidebarLink to="/" >Home</SidebarLink>
-            <SidebarLink to="/jobs">Jobs</SidebarLink>
-            {user && <SidebarLink to="/profile">Profile</SidebarLink>}
-            {user?.role === 'employer' && <SidebarLink to="/post-job">Post Job</SidebarLink>}
-            {user?.role === 'admin' && <SidebarLink to="/dashboard">Admin</SidebarLink>}
-          </nav>
-
-          {/* Footer (user info or auth) */}
-          <div className="p-4 border-t">
+          <nav className="hidden md:flex gap-4 items-center">
             {user ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium">{user.name}</div>
-                  <div className="text-xs text-gray-500">{user.role}</div>
+              <div className="flex items-center gap-3">
+                <NotificationDropdown />
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="w-8 h-8 bg-violet-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+                      {user.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                  </div>
+                  <span className="text-sm text-slate-700">{user.name}</span>
                 </div>
-                <button
-                  onClick={() => {
-                    logout();
-                    closeSidebar();
-                  }}
-                  className="text-sm text-red-600 hover:text-red-800"
-                >
+                <button onClick={() => logout()} className="px-3 py-1.5 bg-rose-600 text-white text-sm rounded-md hover:bg-rose-700 transition">
                   Logout
                 </button>
               </div>
             ) : (
-              <div className="space-x-2">
-                <Link
-                  to="/login"
-                  className="btn btn-primary text-sm"
-                  onClick={closeSidebar}
-                >
+              <>
+                <Link to="/jobs" className="text-sm text-slate-700 hover:text-violet-600">
+                  Jobs
+                </Link>
+                <Link to="/" className="text-sm text-slate-700 hover:text-violet-600">
+                  Home
+                </Link>
+                <Link to="/login" className="text-sm text-violet-600 font-medium">
                   Login
                 </Link>
-                <Link
-                  to="/register"
-                  className="text-sm ml-2"
-                  onClick={closeSidebar}
-                >
-                  Sign up
-                </Link>
-              </div>
+              </>
             )}
-          </div>
+          </nav>
         </div>
-      </aside>
+      </header>
 
-      {/* Page content */}
-      <div className="flex-1 md:ml-64">
-        {/* Top bar for small screens */}
-        <div className="sticky top-0 z-20 bg-white border-b md:hidden">
-          <div className="flex items-center justify-between h-14 px-4">
-            <button
-              onClick={() => setOpen(!open)}
-              aria-label="Toggle menu"
-              className="p-1 rounded-md text-gray-700"
-            >
-              {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
-            </button>
-            <Link to="/" className="font-bold text-lg text-primary">
-              OnlineWorkersKE
-            </Link>
-            <div />
+      <div className="flex-1 flex">
+        {/* overlay for mobile when sidebar open */}
+        {open && !isLarge && (
+          <div
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-20 bg-black/30 md:hidden transition-opacity"
+            aria-hidden
+          />
+        )}
+
+        {/* Sidebar */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-30 transform transition-transform ${open ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static ${SIDEBAR_CLASS}`}
+        >
+          <div className="h-full flex flex-col bg-gradient-to-b from-violet-700 to-indigo-800 text-white shadow-lg">
+            <div className="px-5 py-6 border-b border-white/10">
+              <Link to="/" onClick={close} className="text-lg font-bold">
+                OnlineWorkersKE
+              </Link>
+            </div>
+
+            <nav className="p-4 flex-1 space-y-1 overflow-auto">
+              {user ? (
+                <>
+                  <SidebarLink to="/" close={close}>Home</SidebarLink>
+                  <SidebarLink to="/jobs" close={close}>Jobs</SidebarLink>
+                  <SidebarLink to="/dashboard" close={close}>Dashboard</SidebarLink>
+                  {user?.role === "employer" && <SidebarLink to="/post-job" close={close}>Post Job</SidebarLink>}
+                  <SidebarLink to="/profile" close={close}>Profile</SidebarLink>
+
+                  <div className="mt-4 border-t border-white/10 pt-3 text-sm text-violet-100">
+                    Payments
+                    <div className="mt-2 space-y-1">
+                      {user?.role === "employer" ? (
+                        <>
+                          <SidebarLink to="/payments/topup" close={close}>Top-up escrow</SidebarLink>
+                          <SidebarLink to="/payments" close={close}>Payments</SidebarLink>
+                        </>
+                      ) : (
+                        <>
+                          <SidebarLink to="/payments/request-payout" close={close}>Request payout</SidebarLink>
+                          <SidebarLink to="/payments" close={close}>Payments</SidebarLink>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {user?.role === "admin" && (
+                    <>
+                      <div className="mt-4 border-t border-white/10 pt-3">
+                        <SidebarLink to="/admin/verifications" close={close}>Admin verifications</SidebarLink>
+                        <SidebarLink to="/admin/payments" close={close}>Admin payments</SidebarLink>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <SidebarLink to="/" close={close}>Home</SidebarLink>
+                  <SidebarLink to="/jobs" close={close}>Jobs</SidebarLink>
+                </>
+              )}
+            </nav>
+
+
           </div>
-        </div>
+        </aside>
 
-        <main className="p-4">{children}</main>
+        {/* Main content - center children for forms and pages */}
+        <main className={`flex-1 p-6 ${MAIN_MARGIN_CLASS}`}>
+          <div className="max-w-3xl mx-auto">
+            {children}
+          </div>
+        </main>
       </div>
+
+      <footer className="mt-auto">
+        <div className="container mx-auto px-4">
+          <div className="border-t pt-6">
+            <p className="text-xs text-gray-500 text-center">Built for Kenyan youth — OnlineWorkersKE</p>
+          </div>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+/* SidebarLink as small local component */
+function SidebarLink({ to, children, close }: { to: string; children: React.ReactNode; close: () => void; }) {
+  const location = useLocation();
+  const active = location.pathname === to;
+  return (
+    <Link
+      to={to}
+      onClick={close}
+      className={`block px-3 py-2 rounded-md text-sm font-medium transition ${active ? "bg-white/10 text-white" : "text-violet-100 hover:bg-white/5 hover:text-white"}`}
+    >
+      {children}
+    </Link>
   );
 }

@@ -136,3 +136,32 @@ export async function listUsers(req: Request, res: Response) {
     return res.status(500).json({ message: 'Could not list users' });
   }
 }
+
+
+export async function promoteUserToAdmin(req: Request, res: Response) {
+  try {
+    const adminId = (req as any).userId;
+    const targetId = req.params.id;
+    if (!targetId) return res.status(400).json({ message: 'user id required' });
+
+    const user = await User.findById(targetId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.role = 'admin';
+    user.verified = true; // optional: admins are always trusted
+    await user.save();
+
+    await AuditLog.create({
+      actor: adminId,
+      action: 'admin:promote_user',
+      targetType: 'user',
+      targetId,
+      details: { promotedTo: 'admin' }
+    });
+
+    return res.json({ ok: true, user: { id: user._id, email: user.email, role: user.role } });
+  } catch (err: any) {
+    logger.error('promoteUserToAdmin', err);
+    return res.status(500).json({ message: 'Could not promote user' });
+  }
+}

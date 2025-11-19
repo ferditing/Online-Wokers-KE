@@ -1,28 +1,28 @@
-import { Schema, model, Document, Types } from 'mongoose';
+// backend/src/models/Job.ts
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IJob extends Document {
   title: string;
-  description: string;
-  employer: Types.ObjectId;
-  budget: number;
-  currency: string;
-  assignedWorker?: Types.ObjectId;
+  description?: string;
   requiredSkills?: string[];
-  preferredSkills?: string[];
-  status: 'open' | 'in_progress' | 'completed' | 'cancelled';
-  createdAt: Date;
+  budget?: number;
+  currency?: string;
+  status?: string;
+  employer: mongoose.Types.ObjectId;
+  verified?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const JobSchema = new Schema<IJob>({
   title: { type: String, required: true },
-  description: { type: String, required: true },
-  employer: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  budget: { type: Number, required: true },
-  currency: { type: String, default: 'KES' },
+  description: { type: String },
   requiredSkills: [{ type: String }],
-  preferredSkills: [{ type: String }],
-  assignedWorker: { type: Schema.Types.ObjectId, ref: 'User' },
-  status: { type: String, enum: ['open', 'in_progress', 'completed', 'cancelled'], default: 'open' },
+  budget: { type: Number },
+  currency: { type: String, default: "KES" },
+  status: { type: String, enum: ["open", "in_progress", "completed", "cancelled"], default: "open" },
+  employer: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  verified: { type: Boolean, default: false }
 }, { timestamps: true });
 
-export default model<IJob>('Job', JobSchema);
+export default mongoose.model<IJob>("Job", JobSchema);

@@ -1,19 +1,18 @@
-// src/components/RouteGuards.tsx
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-export const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+export function ProtectedRoute({ children, requireAdmin=false }: any) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (loading) return <div className="container py-6">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (requireAdmin && user.role !== "admin") return <Navigate to="/" replace />;
   return children;
-};
+}
 
-export const GuestRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+export function GuestRoute({ children }: any) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
-  // if authenticated, take them to /jobs (not dashboard) — change if desired
-  if (user) return <Navigate to="/jobs" replace />;
+  if (loading) return <div className="container py-6">Loading...</div>;
+  if (user) return <Navigate to="/" replace />;
   return children;
-};
+}

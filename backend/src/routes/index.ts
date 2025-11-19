@@ -7,6 +7,9 @@ import verificationRoutes from './verification.routes';
 import skillsRoutes from './skills.routes';
 import profileRoutes from './profile.routes';
 import adminRoutes from './admin.routes';
+import userRoutes from './users.routes';
+import appsRoutes from './applications.routes';
+import notificationsRoutes from './notifications.routes';
 
 // ...
 
@@ -19,6 +22,9 @@ router.use('/verification', verificationRoutes);
 router.use('/skills', skillsRoutes);
 router.use('/profile', profileRoutes);
 router.use('/admin', adminRoutes);
+router.use('/users', userRoutes);
+router.use('/applications', appsRoutes);
+router.use('/notifications', notificationsRoutes);
 
 
 export default router;

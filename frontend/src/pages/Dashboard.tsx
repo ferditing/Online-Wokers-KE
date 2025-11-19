@@ -1,27 +1,14 @@
 // frontend/src/pages/Dashboard.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from "recharts";
-import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
+import Card from "../components/ui/Card";
 
 /**
- * Admin Dashboard
- *
- * - Shows top-level stats
- * - Lists pending verification requests with approve/reject actions
- * - Shows latest users and latest jobs
- * - Small jobs-by-status chart (counts)
- *
- * Endpoints used:
- * GET  /api/admin/verification        -> { items: [...] }
- * PATCH /api/admin/verification/:id   -> updates verification (body: { status, comments })
- * GET  /api/admin/users               -> { users, pagination: {...} } (we request a limited list)
- * GET  /api/jobs                      -> returns jobs array (server supports query)
- *
- * Notes: endpoints must be available and protected (require admin token).
+ * Admin Dashboard (polished)
+ * - Top stats
+ * - Users list with recent jobs/applications and verified status
  */
-
-type Skill = { key: string; name: string; category?: string };
 
 type User = {
   _id: string;
@@ -30,285 +17,231 @@ type User = {
   role?: string;
   verified?: boolean;
   skills?: string[];
-  createdAt?: string;
-};
-
-type VerificationRequest = {
-  _id: string;
-  userId: User | string;
-  type: string;
-  fileUrl: string;
-  status: 'pending' | 'approved' | 'rejected';
-  comments?: string;
-  createdAt?: string;
 };
 
 type Job = {
   _id: string;
   title: string;
-  description?: string;
-  requiredSkills?: string[];
-  preferredSkills?: string[];
+  status?: string;
   budget?: number;
   currency?: string;
+};
+
+type Application = {
+  _id: string;
+  job?: Job | any;
   status?: string;
   createdAt?: string;
 };
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [verifications, setVerifications] = useState<VerificationRequest[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [verifications, setVerifications] = useState<number | null>(null);
+  const [paymentsPending, setPaymentsPending] = useState<number | null>(null);
 
-  // Admin guard — show message if not admin
-  if (!user) {
-    return <div className="container py-8">You must be signed in to view this page.</div>;
-  }
-  if (user.role !== 'admin') {
-    return <div className="container py-8">Access denied — admin only.</div>;
-  }
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(50);
 
   useEffect(() => {
     let mounted = true;
-    async function fetchAll() {
-      setLoading(true);
-      setError(null);
+    async function loadStats() {
+      setStatsLoading(true);
       try {
-        // Parallel loads (limited lists)
-        const [vRes, uRes, jRes] = await Promise.all([
-          api.get('/admin/verification'),
-          api.get('/admin/users?limit=10'),
-          api.get('/jobs?limit=50')
+        const [vRes, pRes] = await Promise.all([
+          api.get("/admin/verification?status=pending&limit=1").catch(() => ({ data: { items: [] } })),
+          api.get("/payments?status=release_requested").catch(() => ({ data: [] }))
         ]);
-
         if (!mounted) return;
-
-        setVerifications((vRes.data && vRes.data.items) ? vRes.data.items : []);
-        setUsers((uRes.data && uRes.data.users) ? uRes.data.users : (uRes.data || []));
-        setJobs((jRes.data && jRes.data.jobs) ? jRes.data.jobs : (jRes.data || []));
+        const vItems = vRes.data?.items ?? vRes.data ?? [];
+        const pItems = pRes.data?.payments ?? pRes.data ?? [];
+        setVerifications(Array.isArray(vItems) ? vItems.length : Number(vItems) || 0);
+        setPaymentsPending(Array.isArray(pItems) ? pItems.length : Number(pItems) || 0);
       } catch (err: any) {
         console.error(err);
-        setError(err?.response?.data?.message || 'Failed to load admin data');
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) setStatsLoading(false);
       }
     }
-
-    fetchAll();
+    loadStats();
     return () => { mounted = false; };
   }, []);
 
-  const counts = useMemo(() => {
-    const pendingVerif = verifications.filter(v => v.status === 'pending').length;
-    const totalUsers = users.length;
-    const totalJobs = jobs.length;
-    return { pendingVerif, totalUsers, totalJobs };
-  }, [verifications, users, jobs]);
+  useEffect(() => {
+    let mounted = true;
+    async function loadUsers() {
+      setUsersLoading(true);
+      setError(null);
+      try {
+        // Fetch users list (admin endpoint)
+        const res = await api.get(`/admin/users?limit=${limit}`);
+        const fetched = res.data?.users ?? res.data ?? [];
+        if (!mounted) return;
 
-  const jobsByStatus = useMemo(() => {
-    const map = new Map<string, number>();
-    jobs.forEach(j => {
-      const s = j.status || 'open';
-      map.set(s, (map.get(s) || 0) + 1);
-    });
-    return Array.from(map.entries()).map(([status, count]) => ({ status, count }));
-  }, [jobs]);
+        // For each user, fetch small sample of jobs/applications depending on role
+        // This will produce at most N additional requests where N = users.length (ok for <=50)
+        const withRecent = await Promise.all(
+          fetched.map(async (u: User) => {
+            try {
+              if (u.role === "employer") {
+                const jr = await api.get(`/jobs?employer=${u._id}&limit=3`).catch(() => ({ data: [] }));
+                const jobs = jr.data?.jobs ?? jr.data ?? [];
+                const doneCount = Array.isArray(jobs) ? jobs.filter((j: Job) => j.status === "completed").length : 0;
+                return { ...u, recentJobs: jobs, doneCount };
+              } else {
+                // worker: fetch applications
+                const ar = await api.get(`/applications?worker=${u._id}&limit=6`).catch(() => ({ data: [] }));
+                const apps = ar.data?.applications ?? ar.data ?? [];
+                // count accepted/completed
+                const doneCount = Array.isArray(apps) ? apps.filter((a: Application) => a.status === "accepted" || a.status === "completed").length : 0;
+                // extract recent job titles if populated (safe)
+                const recentJobs = (Array.isArray(apps) ? apps.slice(0, 3).map(a => (a.job && a.job.title) ? a.job : a.jobId ?? a.job ?? null).filter(Boolean) : []);
+                return { ...u, recentJobs, doneCount };
+              }
+            } catch (e) {
+              return { ...u, recentJobs: [], doneCount: 0 };
+            }
+          })
+        );
 
-  async function handleVerificationAction(id: string, status: 'approved' | 'rejected') {
-    setActionLoading(prev => ({ ...prev, [id]: true }));
-    try {
-      // Send update to server
-      await api.patch(`/admin/verification/${id}`, { status });
-      // optimistic UI update
-      setVerifications(prev => prev.map(v => v._id === id ? { ...v, status } : v));
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.response?.data?.message || 'Action failed');
-    } finally {
-      setActionLoading(prev => ({ ...prev, [id]: false }));
+        setUsers(withRecent);
+      } catch (err: any) {
+        console.error(err);
+        setError(err?.response?.data?.message || "Could not load users");
+      } finally {
+        if (mounted) setUsersLoading(false);
+        if (mounted) setLoading(false);
+      }
     }
-  }
+    loadUsers();
+    return () => { mounted = false; };
+  }, [limit]);
 
-  // small helper formats
-  function dateShort(d?: string) {
-    if (!d) return '-';
-    return new Date(d).toLocaleString();
-  }
+  const filtered = useMemo(() => {
+    if (!query) return users;
+    const q = query.toLowerCase();
+    return users.filter(u => (u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
+  }, [users, query]);
+
+  if (loading || statsLoading) return <div className="container py-8">Loading admin dashboard…</div>;
+  if (error) return <div className="container py-8 text-red-600">{error}</div>;
 
   return (
-    <div className="container py-6">
+    <div className="container mx-auto py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
-          <p className="text-sm text-gray-500">Overview & quick actions for OnlineWorkersKE</p>
+          <h1 className="text-2xl font-semibold">Admin dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Users, verifications and platform controls</p>
+        </div>
+        <div className="flex gap-3">
+          <Link to="/admin/verifications" className="px-3 py-2 bg-violet-600 text-white rounded-md">Review verifications</Link>
+          <Link to="/admin/payments" className="px-3 py-2 bg-cyan-600 text-white rounded-md">Payments</Link>
         </div>
       </div>
-
-      {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="card">
-          <div className="text-sm text-gray-500">Pending verifications</div>
-          <div className="flex items-center justify-between mt-3">
-            <div className="text-2xl font-bold">{counts.pendingVerif}</div>
-            <div className="text-xs text-gray-400">Review & approve</div>
-          </div>
-        </div>
+        <Card>
+          <div className="text-sm text-slate-500">Pending verifications</div>
+          <div className="text-2xl font-semibold mt-2">{verifications ?? "—"}</div>
+        </Card>
 
-        <div className="card">
-          <div className="text-sm text-gray-500">Registered users (sample)</div>
-          <div className="flex items-center justify-between mt-3">
-            <div className="text-2xl font-bold">{counts.totalUsers}</div>
-            <div className="text-xs text-gray-400">Latest 10</div>
-          </div>
-        </div>
+        <Card>
+          <div className="text-sm text-slate-500">Users (shown)</div>
+          <div className="text-2xl font-semibold mt-2">{users.length ?? "—"}</div>
+        </Card>
 
-        <div className="card">
-          <div className="text-sm text-gray-500">Jobs (sample)</div>
-          <div className="flex items-center justify-between mt-3">
-            <div className="text-2xl font-bold">{counts.totalJobs}</div>
-            <div className="text-xs text-gray-400">Latest 50</div>
-          </div>
-        </div>
+        <Card>
+          <div className="text-sm text-slate-500">Payments awaiting release</div>
+          <div className="text-2xl font-semibold mt-2">{paymentsPending ?? "—"}</div>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Verification table */}
-        <section className="lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Pending verification requests</h2>
-            <div className="text-sm text-gray-500">{verifications.length} total</div>
-          </div>
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search users by name or email"
+            className="input px-3 py-2 w-[260px]"
+          />
+          <select value={limit} onChange={e => setLimit(Number(e.target.value))} className="input px-3 py-2">
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+        <div className="text-sm text-slate-500">Tip: Click a user to open their profile / verification</div>
+      </div>
 
-          <div className="card overflow-auto">
-            {loading ? <div className="py-8 text-center">Loading...</div> : (
-              verifications.length === 0 ? (
-                <div className="py-8 text-center small text-gray-500">No verification requests</div>
-              ) : (
-                <table className="min-w-full text-left">
-                  <thead>
-                    <tr className="text-xs text-gray-500">
-                      <th className="py-2">User</th>
-                      <th className="py-2">Type</th>
-                      <th className="py-2">Uploaded</th>
-                      <th className="py-2">Status</th>
-                      <th className="py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {verifications.map(v => {
-                      const uid = typeof v.userId === 'object' ? (v.userId as any)._id : String(v.userId);
-                      const uname = typeof v.userId === 'object' ? (v.userId as any).name : (v.userId as any);
-                      return (
-                        <tr key={v._id} className="border-t">
-                          <td className="py-3">
-                            <div className="text-sm font-medium">{uname || '—'}</div>
-                            <div className="text-xs text-gray-400">{String(uid)}</div>
-                          </td>
-                          <td className="py-3 text-sm">{v.type}</td>
-                          <td className="py-3 text-sm text-gray-500">{dateShort(v.createdAt)}</td>
-                          <td className="py-3">
-                            <span className={`px-2 py-1 rounded text-xs ${v.status==='pending' ? 'bg-yellow-100 text-yellow-800' : v.status==='approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {v.status}
-                            </span>
-                          </td>
-                          <td className="py-3">
-                            <div className="flex gap-2">
-                              <a href={v.fileUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">View</a>
-
-                              {v.status === 'pending' && (
-                                <>
-                                  <button
-                                    disabled={!!actionLoading[v._id]}
-                                    onClick={() => handleVerificationAction(v._id, 'approved')}
-                                    className="text-sm px-2 py-1 rounded bg-green-100 text-green-800"
-                                  >
-                                    {actionLoading[v._id] ? '...' : 'Approve'}
-                                  </button>
-
-                                  <button
-                                    disabled={!!actionLoading[v._id]}
-                                    onClick={() => handleVerificationAction(v._id, 'rejected')}
-                                    className="text-sm px-2 py-1 rounded bg-red-100 text-red-800"
-                                  >
-                                    {actionLoading[v._id] ? '...' : 'Reject'}
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )
+      <div className="bg-white border rounded shadow-sm overflow-x-auto">
+        <table className="w-full table-auto">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left px-4 py-3 text-sm">User</th>
+              <th className="text-left px-4 py-3 text-sm">Role</th>
+              <th className="text-left px-4 py-3 text-sm">Verified</th>
+              <th className="text-left px-4 py-3 text-sm">Jobs done</th>
+              <th className="text-left px-4 py-3 text-sm">Recent</th>
+              <th className="px-4 py-3 text-sm" />
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">No users found</td>
+              </tr>
             )}
-          </div>
-        </section>
 
-        {/* Right: Users & Jobs summary */}
-        <aside className="space-y-6">
-          <div className="card">
-            <h3 className="text-sm text-gray-500">Latest users</h3>
-            <div className="mt-3 space-y-3">
-              {users.length === 0 ? <div className="small text-gray-400">No users</div> : users.map(u => (
-                <div key={u._id} className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">{u.name}</div>
-                    <div className="text-xs text-gray-400">{u.email}</div>
-                  </div>
-                  <div className="text-xs">
-                    <span className={`px-2 py-1 rounded ${u.verified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>{u.verified ? 'Verified' : 'Unverified'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+            {filtered.map((u: any) => (
+              <tr key={u._id} className="hover:bg-gray-50">
+                <td className="px-4 py-4">
+                  <div className="font-medium">{u.name}</div>
+                  <div className="text-xs text-slate-500">{u.email}</div>
+                </td>
 
-          <div className="card">
-            <h3 className="text-sm text-gray-500">Jobs by status</h3>
-            <div style={{ height: 180 }} className="mt-3">
-              {jobsByStatus.length === 0 ? (
-                <div className="small text-gray-400">No job data</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={jobsByStatus}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="status" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#0ea5a4" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-        </aside>
+                <td className="px-4 py-4 text-sm text-slate-600">{u.role ?? "—"}</td>
+
+                <td className="px-4 py-4">
+                  {u.verified ? (
+                    <span className="inline-block px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-800">Verified</span>
+                  ) : (
+                    <span className="inline-block px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">Not verified</span>
+                  )}
+                </td>
+
+                <td className="px-4 py-4 text-sm">{u.doneCount ?? 0}</td>
+
+                <td className="px-4 py-4 text-sm">
+                  {Array.isArray(u.recentJobs) && u.recentJobs.length > 0 ? (
+                    <ul className="list-disc list-inside text-sm text-slate-600 max-w-[320px]">
+                      {u.recentJobs.slice(0, 3).map((r: any, i: number) => (
+                        <li key={i} title={r.title ?? r}>{r.title ?? r}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
+                </td>
+
+                <td className="px-4 py-4 text-right">
+                  <div className="flex items-center gap-2 justify-end">
+                    <Link to={`/admin/user/${u._id}`} className="text-sm text-violet-600 hover:underline">View profile</Link>
+                    <Link to={`/admin/verifications?userId=${u._id}`} className="text-sm text-slate-600 hover:underline">Verifications</Link>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <div className="mt-8">
-        <h3 className="text-lg font-medium mb-3">Recent jobs (sample)</h3>
-        <div className="grid gap-3">
-          {jobs.slice(0, 8).map(j => (
-            <div key={j._id} className="card flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium">{j.title}</div>
-                <div className="text-xs text-gray-400">{j.requiredSkills?.join(', ') || 'No skills'}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-semibold">{j.currency} {j.budget}</div>
-                <div className="text-xs text-gray-400">{new Date(j.createdAt || '').toLocaleDateString()}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="mt-6 text-sm text-slate-500">
+        Showing {filtered.length} user(s). Use the limit dropdown to fetch more.
       </div>
-
     </div>
   );
 }

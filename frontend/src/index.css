@@ -1,10 +1,14 @@
-/* frontend/src/index.css — use the standard Tailwind directives */
+/* frontend/src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* App-level helper styles */
+/* root variables */
 :root {
+  --brand-violet: #8b5cf6; /* lighter purple accent */
+  --brand-indigo: #4f46e5;
+  --sidebar-gradient-start: #6d28d9; /* violet-700 */
+  --sidebar-gradient-end: #3b82f6;   /* indigo-500 */
   --container: 1100px;
 }
 
@@ -17,11 +21,52 @@
   padding-right: 1rem;
 }
 
-/* UI helpers */
-.btn {
-  @apply inline-flex items-center justify-center rounded-md px-4 py-2 font-medium transition;
+/* cards & buttons */
+.card {
+  @apply bg-white border border-gray-100 rounded-lg shadow-sm p-4;
 }
-.btn-primary { @apply bg-teal-500 text-white hover:bg-teal-600; }
-.card { @apply bg-white border border-gray-200 rounded-lg shadow-sm p-4; }
-.input { @apply border border-gray-300 rounded-md px-3 py-2 w-full; }
-.small { @apply text-sm text-gray-500; }
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 font-medium transition;
+  background-color: var(--brand-violet);
+  color: white;
+}
+.btn-primary:hover {
+  filter: brightness(0.95);
+}
+
+/* inputs */
+.input {
+  @apply w-full px-3 py-2 border rounded-md bg-white text-sm;
+}
+
+/* small text helper */
+.small {
+  @apply text-sm text-gray-500;
+}
+
+/* Sidebar visuals (cooperate with Layout.tsx gradient)
+   we keep specific look in Tailwind classes in Layout.tsx, but these provide fine-tune if needed */
+
+.bg-sidebar {
+  background: linear-gradient(180deg, var(--sidebar-gradient-start), var(--sidebar-gradient-end));
+  color: white;
+}
+
+/* reduce default main padding on small view to avoid large whitespace */
+@media (min-width: 768px) {
+  main {
+    /* main uses md:ml-56 via Layout.tsx to align with sidebar width */
+  }
+}
+
+/* form card style used on register/login - make it stand out */
+.form-card {
+  @apply bg-white rounded-xl shadow-lg p-6;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+
+/* small helper to make links visible on sidebar */
+.link-muted {
+  color: rgba(255,255,255,0.9);
+}

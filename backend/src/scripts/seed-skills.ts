@@ -5,7 +5,11 @@ dotenv.config();
 import Skill from '../models/Skill'; // adjust path if your model is elsewhere
 
 async function main() {
-  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/onlineworkerske';
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    console.error('MONGO_URI environment variable is not set');
+    process.exit(1);
+  }
   console.log('Connecting to', uri);
   await mongoose.connect(uri, {});
 

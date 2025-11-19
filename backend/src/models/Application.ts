@@ -5,6 +5,7 @@ export interface ISubmission {
   files?: string[];
   notes?: string;
   submittedAt?: Date;
+  approvedAt?: Date;
 }
 
 export interface IApplication extends Document {
@@ -22,6 +23,7 @@ const SubmissionSchema = new Schema<ISubmission>({
   files: [{ type: String }],
   notes: { type: String },
   submittedAt: { type: Date },
+  approvedAt: { type: Date },
 }, { _id: false });
 
 const ApplicationSchema = new Schema<IApplication>({
