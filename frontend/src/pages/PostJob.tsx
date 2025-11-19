@@ -1,9 +1,9 @@
 // frontend/src/pages/PostJob.tsx
-import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { createJob } from "../services/jobs.service";
 import { listSkills } from "../services/skills.service";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 
 type Form = {
   title: string;
@@ -13,7 +13,7 @@ type Form = {
   category?: string;
   requiredSkills: string[];
   preferredSkills: string[];
-  verifyJob: boolean;
+  verifyJob: boolean | string; // radio returns string "true"/"false"
 };
 
 export default function PostJob() {
@@ -33,13 +33,15 @@ export default function PostJob() {
     (async () => {
       try {
         const s = await listSkills();
-        const list = s.skills ?? s ?? [];
+        const list = (s?.skills ?? s) as any[] ?? [];
         setSkillsCatalog(list);
-        // set default category once skills are loaded if not already set
-        const cats = Array.from(new Set(list.map((it: any) => (it.category ?? "Other"))));
+
+        // derive unique categories from skills
+        const cats = Array.from(new Set(list.map((it: any) => (it?.category ?? "Other"))));
+
         if (cats.length > 0) {
-          // only set if form category is empty
-          const current = watch("category") as string || "";
+          // only set if form category is empty or unset
+          const current = (watchedCategory ?? "").toString();
           if (!current) {
             setValue("category", cats[0]);
           }
@@ -49,7 +51,7 @@ export default function PostJob() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setValue]);
+  }, [setValue]); // keep as before; we use watchedCategory in render
 
   // keep RHF values in sync with local arrays
   useEffect(() => { setValue("requiredSkills", requiredSkills); }, [requiredSkills, setValue]);
@@ -57,13 +59,13 @@ export default function PostJob() {
 
   // derive list of categories
   const categories = useMemo(() => {
-    return Array.from(new Set(skillsCatalog.map(s => s.category ?? "Other")));
+    return Array.from(new Set(skillsCatalog.map(s => s?.category ?? "Other")));
   }, [skillsCatalog]);
 
   // skills filtered by chosen category (use watchedCategory)
   const filtered = useMemo(() => {
-    const cat = watchedCategory || (categories[0] ?? "Other");
-    return skillsCatalog.filter(s => (s.category ?? "Other") === cat);
+    const cat = (watchedCategory && watchedCategory !== "") ? watchedCategory : (categories[0] ?? "Other");
+    return skillsCatalog.filter(s => (s?.category ?? "Other") === cat);
   }, [skillsCatalog, watchedCategory, categories]);
 
   function toggleRequired(key: string) {
@@ -82,6 +84,9 @@ export default function PostJob() {
   }
 
   async function onSubmit(data: Form) {
+    // normalize verifyJob (radio returns string "true"/"false")
+    const verify = data.verifyJob === true || data.verifyJob === "true";
+
     // local validation
     if (!data.title || data.title.trim().length < 3) {
       alert("Please provide a valid title (min 3 characters).");
@@ -110,20 +115,21 @@ export default function PostJob() {
         category: data.category,
         requiredSkills: data.requiredSkills || [],
         preferredSkills: data.preferredSkills || [],
-        verifyJob: data.verifyJob,
+        verifyJob: verify,
       };
 
       const createdJob = await createJob(payload);
 
       // If user chose to verify job, redirect to payment page
-      if (data.verifyJob) {
+      if (verify) {
         nav(`/jobs/${createdJob._id}/verify`);
       } else {
         nav("/jobs");
       }
     } catch (err: any) {
       console.error("Create job failed", err);
-      alert(err?.response?.data?.message || "Failed to create job");
+      const message = (err?.response?.data?.message) ?? err?.message ?? String(err);
+      alert(message || "Failed to create job");
     } finally {
       setBusy(false);
     }

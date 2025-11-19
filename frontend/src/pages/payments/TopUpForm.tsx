@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Card from "../../components/ui/Card";
 
 export default function TopUpForm() {
-  const { user } = useAuth() as any;
+  useAuth() as any;
   const [amount, setAmount] = useState<number | "">("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [busy, setBusy] = useState(false);

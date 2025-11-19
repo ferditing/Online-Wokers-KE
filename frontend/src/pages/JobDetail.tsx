@@ -22,6 +22,7 @@ type Job = {
   budget?: number;
   currency?: string;
   status?: string;
+  verified?: boolean;
   employer?: { _id?: string; name?: string; email?: string } | string;
 };
 

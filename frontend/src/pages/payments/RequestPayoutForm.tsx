@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import api from "../../services/api";
-import { useAuth } from "../../context/AuthContext";
 import Card from "../../components/ui/Card";
 
 export default function RequestPayoutForm() {
-  const { user } = useAuth() as any;
+  
   const [amount, setAmount] = useState<number | "">("");
   const [method, setMethod] = useState<"mpesa" | "bank">("mpesa");
   const [accountInfo, setAccountInfo] = useState("");
@@ -23,7 +22,7 @@ export default function RequestPayoutForm() {
       if (method === "mpesa") payload.accountInfo = accountInfo || ""; // phone number
       else payload.accountInfo = accountInfo; // bank details (JSON/string)
 
-      const res = await api.post("/payments/request-payout", payload);
+      await api.post("/payments/request-payout", payload);
       setMessage("Payout request submitted. Status: pending approval.");
 
       // optionally clear

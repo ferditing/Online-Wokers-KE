@@ -7,34 +7,32 @@ import NotificationDropdown from "./NotificationDropdown";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth() as any;
-  const [open, setOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLarge, setIsLarge] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : true);
   const location = useLocation();
 
-  // constants - keep in sync with CSS margin
-  const SIDEBAR_WIDTH_PX = 224; // 14rem
-  const SIDEBAR_CLASS = "w-56"; // tailwind width to match 14rem
+  const SIDEBAR_WIDTH_CLASS = "md:w-56"; // 14rem
   const MAIN_MARGIN_CLASS = "md:ml-56";
 
+  // Handle window resize
   useEffect(() => {
     function onResize() {
       const lg = window.innerWidth >= 768;
       setIsLarge(lg);
-      setOpen(lg);
+      setSidebarOpen(lg);
     }
     window.addEventListener("resize", onResize);
     onResize();
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // close sidebar on navigation (mobile only)
+  // Close sidebar on navigation (mobile)
   useEffect(() => {
-    if (!isLarge) setOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+    if (!isLarge) setSidebarOpen(false);
+  }, [location.pathname, isLarge]);
 
-  const close = () => {
-    if (!isLarge) setOpen(false);
+  const closeSidebar = () => {
+    if (!isLarge) setSidebarOpen(false);
   };
 
   return (
@@ -43,8 +41,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="bg-white/80 backdrop-blur-sm border-b">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => setOpen((v) => !v)} className="md:hidden p-1 rounded-md text-violet-600 hover:bg-violet-50">
-              {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="md:hidden p-1 rounded-md text-violet-600 hover:bg-violet-50"
+            >
+              {sidebarOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
             </button>
 
             <Link to="/" className="text-xl font-bold text-violet-600">
@@ -65,7 +66,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                   <span className="text-sm text-slate-700">{user.name}</span>
                 </div>
-                <button onClick={() => logout()} className="px-3 py-1.5 bg-rose-600 text-white text-sm rounded-md hover:bg-rose-700 transition">
+                <button
+                  onClick={() => logout()}
+                  className="px-3 py-1.5 bg-rose-600 text-white text-sm rounded-md hover:bg-rose-700 transition"
+                >
                   Logout
                 </button>
               </div>
@@ -87,22 +91,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="flex-1 flex">
-        {/* overlay for mobile when sidebar open */}
-        {open && !isLarge && (
+        {/* Mobile overlay */}
+        {sidebarOpen && !isLarge && (
           <div
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-20 bg-black/30 md:hidden transition-opacity"
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-20 bg-black/30 md:hidden"
             aria-hidden
           />
         )}
 
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-30 transform transition-transform ${open ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static ${SIDEBAR_CLASS}`}
+          className={`fixed inset-y-0 left-0 z-30 transform transition-transform bg-gradient-to-b from-violet-700 to-indigo-800 text-white shadow-lg
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${SIDEBAR_WIDTH_CLASS}`}
         >
-          <div className="h-full flex flex-col bg-gradient-to-b from-violet-700 to-indigo-800 text-white shadow-lg">
+          <div className="h-full flex flex-col">
             <div className="px-5 py-6 border-b border-white/10">
-              <Link to="/" onClick={close} className="text-lg font-bold">
+              <Link to="/" onClick={closeSidebar} className="text-lg font-bold">
                 OnlineWorkersKE
               </Link>
             </div>
@@ -110,53 +115,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <nav className="p-4 flex-1 space-y-1 overflow-auto">
               {user ? (
                 <>
-                  <SidebarLink to="/" close={close}>Home</SidebarLink>
-                  <SidebarLink to="/jobs" close={close}>Jobs</SidebarLink>
-                  <SidebarLink to="/dashboard" close={close}>Dashboard</SidebarLink>
-                  {user?.role === "employer" && <SidebarLink to="/post-job" close={close}>Post Job</SidebarLink>}
-                  <SidebarLink to="/profile" close={close}>Profile</SidebarLink>
+                  <SidebarLink to="/" close={closeSidebar}>Home</SidebarLink>
+                  <SidebarLink to="/jobs" close={closeSidebar}>Jobs</SidebarLink>
+                  <SidebarLink to="/dashboard" close={closeSidebar}>Dashboard</SidebarLink>
+                  {user?.role === "employer" && <SidebarLink to="/post-job" close={closeSidebar}>Post Job</SidebarLink>}
+                  <SidebarLink to="/profile" close={closeSidebar}>Profile</SidebarLink>
 
                   <div className="mt-4 border-t border-white/10 pt-3 text-sm text-violet-100">
                     Payments
                     <div className="mt-2 space-y-1">
                       {user?.role === "employer" ? (
                         <>
-                          <SidebarLink to="/payments/topup" close={close}>Top-up escrow</SidebarLink>
-                          <SidebarLink to="/payments" close={close}>Payments</SidebarLink>
+                          <SidebarLink to="/payments/topup" close={closeSidebar}>Top-up escrow</SidebarLink>
+                          <SidebarLink to="/payments" close={closeSidebar}>Payments</SidebarLink>
                         </>
                       ) : (
                         <>
-                          <SidebarLink to="/payments/request-payout" close={close}>Request payout</SidebarLink>
-                          <SidebarLink to="/payments" close={close}>Payments</SidebarLink>
+                          <SidebarLink to="/payments/request-payout" close={closeSidebar}>Request payout</SidebarLink>
+                          <SidebarLink to="/payments" close={closeSidebar}>Payments</SidebarLink>
                         </>
                       )}
                     </div>
                   </div>
 
                   {user?.role === "admin" && (
-                    <>
-                      <div className="mt-4 border-t border-white/10 pt-3">
-                        <SidebarLink to="/admin/verifications" close={close}>Admin verifications</SidebarLink>
-                        <SidebarLink to="/admin/payments" close={close}>Admin payments</SidebarLink>
-                      </div>
-                    </>
+                    <div className="mt-4 border-t border-white/10 pt-3">
+                      <SidebarLink to="/admin/verifications" close={closeSidebar}>Admin verifications</SidebarLink>
+                      <SidebarLink to="/admin/payments" close={closeSidebar}>Admin payments</SidebarLink>
+                    </div>
                   )}
                 </>
               ) : (
                 <>
-                  <SidebarLink to="/" close={close}>Home</SidebarLink>
-                  <SidebarLink to="/jobs" close={close}>Jobs</SidebarLink>
+                  <SidebarLink to="/" close={closeSidebar}>Home</SidebarLink>
+                  <SidebarLink to="/jobs" close={closeSidebar}>Jobs</SidebarLink>
                 </>
               )}
             </nav>
-
-
           </div>
         </aside>
 
-        {/* Main content - center children for forms and pages */}
+        {/* Main content */}
         <main className={`flex-1 p-6 ${MAIN_MARGIN_CLASS}`}>
-          <div className="max-w-3xl mx-auto">
+          <div className="w-full">
             {children}
           </div>
         </main>
@@ -173,7 +174,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* SidebarLink as small local component */
+/* SidebarLink local component */
 function SidebarLink({ to, children, close }: { to: string; children: React.ReactNode; close: () => void; }) {
   const location = useLocation();
   const active = location.pathname === to;
@@ -181,7 +182,8 @@ function SidebarLink({ to, children, close }: { to: string; children: React.Reac
     <Link
       to={to}
       onClick={close}
-      className={`block px-3 py-2 rounded-md text-sm font-medium transition ${active ? "bg-white/10 text-white" : "text-violet-100 hover:bg-white/5 hover:text-white"}`}
+      className={`block px-3 py-2 rounded-md text-sm font-medium transition
+        ${active ? "bg-white/10 text-white" : "text-violet-100 hover:bg-white/5 hover:text-white"}`}
     >
       {children}
     </Link>

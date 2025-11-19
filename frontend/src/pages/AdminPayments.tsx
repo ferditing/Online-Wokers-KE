@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+// frontend/src/pages/AdminPayments.tsx
+import { useEffect, useState } from "react";
 import api from "../services/api";
 import Card from "../components/ui/Card";
 import { Link } from "react-router-dom";
 
 type Payment = {
   _id: string;
-  userId?: any;
+  userId?: string | { _id?: string; name?: string };
   amount: number;
   currency?: string;
   type?: string;
@@ -43,8 +44,8 @@ export default function AdminPayments() {
   async function handleDecision(id: string, approve: boolean) {
     setProcessing(prev => ({ ...prev, [id]: true }));
     try {
-      const res = await api.patch(`/admin/payments/${id}`, { status: approve ? "approved" : "rejected" });
-      // update local list
+      await api.patch(`/admin/payments/${id}`, { status: approve ? "approved" : "rejected" });
+      // remove from local list
       setPayments(prev => prev.filter(p => p._id !== id));
     } catch (err: any) {
       console.error(err);
@@ -67,26 +68,40 @@ export default function AdminPayments() {
       <div className="space-y-3">
         {payments.length === 0 && <Card><div className="text-sm text-slate-500">No pending payments</div></Card>}
 
-        {payments.map(p => (
-          <Card key={p._id}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-medium">{p.type} — {p.userId?.name ?? p.userId ?? "User"}</div>
-                <div className="text-xs text-slate-500">{p.currency ?? "KES"} {p.amount}</div>
-                <div className="text-xs text-slate-400 mt-1">{p.meta?.note}</div>
-              </div>
+        {payments.map(p => {
+          const userName = typeof p.userId === "string"
+            ? p.userId
+            : (p.userId?.name ?? (p.userId?._id ?? "User"));
 
-              <div className="flex items-center gap-2">
-                <button className="px-3 py-1 bg-emerald-600 text-white rounded" onClick={() => handleDecision(p._1?._id ?? p._id, true)} disabled={processing[p._id]}>
-                  {processing[p._id] ? "…" : "Approve"}
-                </button>
-                <button className="px-3 py-1 bg-rose-100 text-rose-700 rounded" onClick={() => handleDecision(p._id, false)} disabled={processing[p._id]}>
-                  {processing[p._id] ? "…" : "Reject"}
-                </button>
+          return (
+            <Card key={p._id}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium">{p.type} — {userName}</div>
+                  <div className="text-xs text-slate-500">{p.currency ?? "KES"} {p.amount}</div>
+                  <div className="text-xs text-slate-400 mt-1">{p.meta?.note}</div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    className="px-3 py-1 bg-emerald-600 text-white rounded"
+                    onClick={() => handleDecision(p._id, true)}
+                    disabled={processing[p._id]}
+                  >
+                    {processing[p._id] ? "…" : "Approve"}
+                  </button>
+                  <button
+                    className="px-3 py-1 bg-rose-100 text-rose-700 rounded"
+                    onClick={() => handleDecision(p._id, false)}
+                    disabled={processing[p._id]}
+                  >
+                    {processing[p._id] ? "…" : "Reject"}
+                  </button>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

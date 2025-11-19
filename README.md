@@ -97,9 +97,11 @@ API documentation is available via OpenAPI/Swagger. Access it at:
 Local: http://localhost:5000/api-docs
 Deployed: [Insert deployed backend URL]/api-docs
 ## 🔗 Deployed Links
-# Frontend: [Insert deployed frontend URL]
-# Backend API: [Insert deployed backend URL]
-🤝 Contributing
+# Frontend: [https://frontend-seven-kappa-61.vercel.app/]
+
+# Backend API: [https://online-wokers-ke-1.onrender.com]
+
+## 🤝 Contributing
 Fork the repository
 Create a feature branch (git checkout -b feature/amazing-feature)
 Commit your changes (git commit -m 'Add some amazing feature')
