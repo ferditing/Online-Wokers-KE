@@ -2,30 +2,35 @@
 import axios from "axios";
 import { getTokenFromStorage } from "./token";
 
-const BASE = import.meta.env.VITE_API_URL + '/api';
+// Ensure VITE_API_URL exists
+const BASE_URL = import.meta.env.VITE_API_URL;
+if (!BASE_URL) {
+  throw new Error("VITE_API_URL environment variable is not defined");
+}
 
+// Create axios instance
 const api = axios.create({
-  baseURL: BASE,
+  baseURL: BASE_URL.endsWith("/") ? `${BASE_URL}api` : `${BASE_URL}/api`, // add /api if your backend uses it
   headers: { "Content-Type": "application/json" },
-  timeout: 20000
+  timeout: 20000,
 });
 
-// Attach any existing token synchronously at module import time
+// Attach token if it exists
 const stored = getTokenFromStorage();
 if (stored) {
   api.defaults.headers.common["Authorization"] = `Bearer ${stored}`;
 }
 
-// Response interceptor: log 401s but don't auto-clear token here (AuthContext controls logout)
+// Response interceptor
 api.interceptors.response.use(
-  r => r,
-  err => {
-    const status = err?.response?.status;
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
     if (status === 401) {
-      // DO NOT remove token here — we will let AuthContext handle logout to avoid races.
-      console.warn("API returned 401 Unauthorized", err?.response?.config?.url);
+      console.warn("API returned 401 Unauthorized", error?.response?.config?.url);
+      // Optionally, handle global logout in AuthContext
     }
-    return Promise.reject(err);
+    return Promise.reject(error);
   }
 );
 
