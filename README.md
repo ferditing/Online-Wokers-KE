@@ -1,19 +1,21 @@
-Online Workers Platform
+# Online Workers Platform
 A comprehensive platform connecting employers with freelancers for various tasks and projects, featuring secure payments via M-Pesa, real-time notifications, and escrow services.
 
-🚀 Features
-User Authentication & Profiles: Secure registration, login, and profile management with verification
-Job Management: Post jobs, browse available work, apply for positions
-Application System: Submit applications with proposals and track status
-Payment Integration: M-Pesa integration for top-ups, payouts, and job payments
-Escrow Services: Secure fund holding until job completion
-Real-time Notifications: Socket.io powered notifications for updates
-Review System: Rate and review completed work
-Admin Panel: Administrative controls for user and payment management
-File Uploads: AWS S3 integration for document and image uploads
-Audit Logging: Comprehensive logging for security and compliance
-🛠 Tech Stack
-Backend
+# 🚀 Features
+
+- User Authentication & Profiles: Secure registration, login, and - - profile management with verification
+-   Job Management: Post jobs, browse available work, apply for -   - positions
+-   Application System: Submit applications with proposals and track status
+-   Payment Integration: M-Pesa integration for top-ups, payouts, and job payments
+-   Escrow Services: Secure fund holding until job completion
+-   Real-time Notifications: Socket.io powered notifications for updates
+-   Review System: Rate and review completed work
+-   Admin Panel: Administrative controls for user and payment management
+-   File Uploads: AWS S3 integration for document and image uploads
+-   Audit Logging: Comprehensive logging for security and compliance
+
+# 🛠 Tech Stack
+#### Backend
 Runtime: Node.js
 Framework: Express.js with TypeScript
 Database: MongoDB with Mongoose
@@ -33,7 +35,8 @@ HTTP Client: Axios
 Real-time: Socket.io Client
 Notifications: React Toastify
 Routing: React Router DOM
-📋 Prerequisites
+
+#### 📋 Prerequisites
 Node.js (v18 or higher)
 MongoDB
 Redis
@@ -43,32 +46,35 @@ M-Pesa API credentials
 Clone the repository
 
 
-git clone <repository-url>
+git clone https://github.com/ferditing/Online-Wokers-KE
 cd onlineworkers
-Backend Setup
+
+## Backend Setup
 
 
 cd backend
 npm install
 cp .env.example .env  # Configure your environment variables
 npm run dev
-Frontend Setup
+
+## Frontend Setup
 
 
 cd ../frontend
 npm install
 npm run dev
-📖 Usage
+
+### 📖 Usage
 Start the backend server (runs on port 5000 by default)
 Start the frontend development server (runs on port 5173 by default)
 Access the application at http://localhost:5173
 Environment Variables
 Create .env files in both backend and frontend directories with the following variables:
 
-Backend (.env)
+## Backend (.env)
 
 
-MONGODB_URI=mongodb://localhost:27017/onlineworkers
+MONGODB_URI=yourmongo uri
 JWT_SECRET=your-jwt-secret
 PORT=5000
 FRONTEND_URL=http://localhost:5173
@@ -90,9 +96,9 @@ API documentation is available via OpenAPI/Swagger. Access it at:
 
 Local: http://localhost:5000/api-docs
 Deployed: [Insert deployed backend URL]/api-docs
-🔗 Deployed Links
-Frontend: [Insert deployed frontend URL]
-Backend API: [Insert deployed backend URL]
+## 🔗 Deployed Links
+# Frontend: [Insert deployed frontend URL]
+# Backend API: [Insert deployed backend URL]
 🤝 Contributing
 Fork the repository
 Create a feature branch (git checkout -b feature/amazing-feature)
