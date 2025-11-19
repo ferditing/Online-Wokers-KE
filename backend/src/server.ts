@@ -14,7 +14,9 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://tingishaferdinand_db_u
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173'],
+    origin: ['http://localhost:5173',
+      'https://frontend-seven-kappa-61.vercel.app',
+    ],
     credentials: true
   }
 });
@@ -29,7 +31,7 @@ async function start() {
     initSocket(io);
 
     server.listen(PORT, () => {
-      logger.info(`Server running on http://localhost:${PORT}`);
+      logger.info(`Server running on ${PORT}`);
     });
   } catch (err) {
     logger.error('Failed to start server', err);
