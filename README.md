@@ -11,6 +11,62 @@ A full platform connecting employers and freelancers. Features secure M-Pesa pay
 
 ---
 
+## Screenshots
+### Landing Page
+![Landing Page](docs/LandingPage.png)
+
+### Employer Dashboard
+![Employer Dashboard](docs/EmployerDashboard.png)
+
+### Employer Post Job
+![Employer Post Job](docs/EmployerPostJOb.png)
+
+### Employer Profile
+![Employer Profile](docs/EmployerProile.png)
+
+### Employer Top Up Escrow
+![Employer Top Up Escrow](docs/EmployerTopUpescrow.png)
+
+### Worker Dashboard
+![Worker Dashboard](docs/wokerDasboard.png)
+
+### Worker Profile
+![Worker Profile](docs/wokerProfile.png)
+
+### Worker Request Payout
+![Worker Request Payout](docs/wokerRequestPayout.png)
+
+### Employer Payments
+![employer List Escrow Top Ups](docs/employerpayments.png)
+
+---
+
+
+
+### Home
+![Home](docs/Home.png)
+
+### Login
+![Login](docs/Login.png)
+
+### Signup
+![Signup](docs/Signup.png)
+
+### Jobs
+![Jobs](docs/Jobs.png)
+
+### Apply Job
+![Apply Job](docs/apply-job.png)
+
+### Admin Dashboard
+![Admin Dashboard](docs/Admin-dashbaord.png)
+
+### Admin Verify Profile
+![Admin Verify Profile](docs/Admin-Verify-Profile.png)
+
+
+
+
 # 🚀 Features
 
 * **User Authentication & Profiles** — registration, login, verification
@@ -162,34 +218,4 @@ This project is licensed under the **ISC License**.
 # 📞 Support
 
 For support: **[tingishaferdinand@gmail.com](mailto:tingishaferdinand@gmail.com)** or open an issue on the repository.
-
----
-
-### Landing Page
-![Landing Page](docs/LandingPage.png)
-
-### Employer Dashboard
-![Employer Dashboard](docs/EmployerDashboard.png)
-
-### Employer Post Job
-![Employer Post Job](docs/EmployerPostJOb.png)
-
-### Employer Profile
-![Employer Profile](docs/EmployerProile.png)
-
-### Employer Top Up Escrow
-![Employer Top Up Escrow](docs/EmployerTopUpescrow.png)
-
-### Worker Dashboard
-![Worker Dashboard](docs/wokerDasboard.png)
-
-### Worker Profile
-![Worker Profile](docs/wokerProfile.png)
-
-### Worker Request Payout
-![Worker Request Payout](docs/wokerRequestPayout.png)
-
-### Employer Payments
-![employer List Escrow Top Ups](docs/employerpayments.png)
-`
 
