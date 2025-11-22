@@ -1,4 +1,3 @@
-// frontend/src/components/QuickPaymentActions.tsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -11,31 +10,66 @@ export default function QuickPaymentActions({ compact }: QuickPaymentActionsProp
   const [open, setOpen] = useState(false);
 
   if (compact) {
-    // small compact icon/buttons for desktop navbar
     return (
       <div className="flex items-center gap-2">
-        <Link to="/payments/topup" className="text-sm px-3 py-1 border rounded hover:bg-violet-50">Top up</Link>
-        <Link to="/payments/request-payout" className="text-sm px-3 py-1 border rounded hover:bg-violet-50">Withdraw</Link>
+        <Link 
+          to="/payments/topup" 
+          className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-medium rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-105"
+        >
+          Top up
+        </Link>
+        <Link 
+          to="/payments/request-payout" 
+          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white text-sm font-medium rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-105"
+        >
+          Withdraw
+        </Link>
       </div>
     );
   }
 
-  // full UI (e.g., used in a sidebar or expanded header)
   return (
     <div className="relative">
       <button
         onClick={() => setOpen(v => !v)}
-        className="px-3 py-1 border rounded bg-white hover:bg-gray-50"
+        className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:shadow-lg transition-all duration-200 flex items-center gap-2"
         aria-expanded={open}
       >
         Payments
+        <span className={`transform transition-transform ${open ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow p-2 z-20">
-          <Link to="/payments/topup" className="block py-1 px-2 hover:bg-slate-50">Top up</Link>
-          <Link to="/payments/request-payout" className="block py-1 px-2 hover:bg-slate-50">Request payout</Link>
-          <Link to="/payments" className="block py-1 px-2 hover:bg-slate-50">Payments</Link>
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-20 space-y-1">
+          <Link 
+            to="/payments/topup" 
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors group"
+          >
+            <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-green-500 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm">💰</span>
+            </div>
+            <span>Top up escrow</span>
+          </Link>
+          <Link 
+            to="/payments/request-payout" 
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors group"
+          >
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm">💸</span>
+            </div>
+            <span>Request payout</span>
+          </Link>
+          <Link 
+            to="/payments" 
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors group"
+          >
+            <div className="w-8 h-8 bg-gradient-to-r from-slate-500 to-slate-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm">📊</span>
+            </div>
+            <span>Payments history</span>
+          </Link>
         </div>
       )}
     </div>

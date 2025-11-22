@@ -50,7 +50,6 @@ export default function PayForJob() {
     doQuery();
     pollRef.current = window.setInterval(doQuery, 5000);
     return () => clearPolling();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkoutId]);
 
   const clearPolling = () => {
@@ -77,7 +76,6 @@ export default function PayForJob() {
       });
 
       const payload = res.data ?? res.data?.data ?? {};
-      // try several shapes
       const checkoutRequestId = payload.checkoutRequestId ?? payload.checkoutRequestID ?? payload.mpesa?.checkoutRequestId ?? payload.mpesa?.checkoutRequestID ?? null;
       const returnedPaymentId = payload.payment?._id ?? payload.paymentId ?? null;
 
@@ -99,98 +97,145 @@ export default function PayForJob() {
 
   useEffect(() => () => clearPolling(), []);
 
+  const isEmployer = user?.role === 'employer';
+
   return (
-    <div className="container mx-auto py-8 max-w-md">
-      <Card>
-        <h2 className="text-xl font-semibold mb-2">
-          {user?.role === 'employer' ? 'Verify Job' : 'Pay for Job'}
-        </h2>
-        <p className="text-sm text-slate-500 mb-4">
-          {user?.role === 'employer'
-            ? 'Pay a small fee to verify your job and get more visibility to workers.'
-            : 'Complete payment for this job via M-Pesa. Funds will be held in escrow until job completion.'}
-        </p>
-
-        <form onSubmit={handlePayment} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Amount (KES)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
-              className="input w-full"
-              min={user?.role === 'employer' ? 100 : 50}
-              step={50}
-              placeholder={user?.role === 'employer' ? "100" : "e.g. 1000"}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">M-Pesa Phone Number</label>
-            <input
-              type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="input w-full"
-              placeholder="07XXXXXXXX or 254XXXXXXXXX"
-              required
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              Enter the phone number registered with M-Pesa
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md mx-auto">
+        <Card className="space-y-6">
+          <div className="text-center space-y-3">
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${
+              isEmployer 
+                ? "bg-gradient-to-r from-blue-500 to-cyan-600" 
+                : "bg-gradient-to-r from-violet-600 to-purple-600"
+            }`}>
+              <span className="text-white text-2xl">
+                {isEmployer ? "✓" : "💰"}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">
+              {isEmployer ? 'Verify Job' : 'Pay for Job'}
+            </h2>
+            <p className="text-slate-600">
+              {isEmployer
+                ? 'Pay a small fee to verify your job and get more visibility'
+                : 'Complete payment for this job via M-Pesa'}
             </p>
           </div>
 
-          <div className="bg-blue-50 p-3 rounded text-sm">
-            <p className="font-medium text-blue-800">Payment Flow:</p>
-            <ol className="list-decimal list-inside text-blue-700 mt-1 space-y-1">
-              {user?.role === 'employer' ? (
-                <>
-                  <li>Pay verification fee</li>
-                  <li>Job gets verified badge</li>
-                </>
-              ) : (
-                <>
-                  <li>Click "Pay Now" to initiate STK Push</li>
-                  <li>Complete payment on your phone</li>
-                </>
-              )}
-            </ol>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              type="submit"
-              disabled={busy || paymentStatus === 'processing'}
-              className="flex-1"
-              variant={paymentStatus === 'success' ? 'success' : 'primary'}
-            >
-              {busy ? "Processing..." :
-               paymentStatus === 'success' ? "Payment Initiated ✓" :
-               "Pay Now via M-Pesa"}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => navigate(-1)}
-              variant="secondary"
-            >
-              Cancel
-            </Button>
-          </div>
-
-          {message && (
-            <div className={`text-sm p-3 rounded mt-2 ${
-              paymentStatus === 'success' ? 'bg-green-50 text-green-700' :
-              paymentStatus === 'failed' ? 'bg-red-50 text-red-700' :
-              'bg-blue-50 text-blue-700'
-            }`}>
-              {message}
+          <form onSubmit={handlePayment} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Amount (KES)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200"
+                min={isEmployer ? 100 : 50}
+                step={50}
+                placeholder={isEmployer ? "100" : "e.g. 1000"}
+                required
+              />
             </div>
-          )}
 
-          {checkoutId && <div className="text-xs text-slate-500 mt-2">Checkout: <code>{checkoutId}</code></div>}
-        </form>
-      </Card>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">M-Pesa Phone Number</label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200"
+                placeholder="07XXXXXXXX or 254XXXXXXXXX"
+                required
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Enter the phone number registered with M-Pesa
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200">
+              <p className="font-semibold text-blue-800 mb-2">Payment Flow:</p>
+              <ol className="text-blue-700 space-y-2">
+                {isEmployer ? (
+                  <>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Pay verification fee
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Job gets verified badge
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Click "Pay Now" to initiate STK Push
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      Complete payment on your phone
+                    </li>
+                  </>
+                )}
+              </ol>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                type="submit"
+                disabled={busy || paymentStatus === 'processing'}
+                className="flex-1"
+                variant={
+                  paymentStatus === 'success' ? 'success' : 
+                  paymentStatus === 'failed' ? 'danger' : 'primary'
+                }
+              >
+                {busy ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Processing...
+                  </div>
+                ) : paymentStatus === 'success' ? (
+                  "Payment Successful ✓"
+                ) : paymentStatus === 'processing' ? (
+                  "Waiting for Confirmation..."
+                ) : (
+                  "Pay Now via M-Pesa"
+                )}
+              </Button>
+              
+              <Button
+                type="button"
+                onClick={() => navigate(-1)}
+                variant="secondary"
+                className="flex-shrink-0"
+              >
+                Cancel
+              </Button>
+            </div>
+
+            {message && (
+              <div className={`p-4 rounded-xl text-sm font-medium ${
+                paymentStatus === 'success' 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                  : paymentStatus === 'failed' 
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+              }`}>
+                {message}
+              </div>
+            )}
+
+            {checkoutId && (
+              <div className="text-xs text-slate-500 p-3 bg-slate-50 rounded-lg">
+                Transaction ID: <code className="bg-slate-100 px-2 py-1 rounded">{checkoutId}</code>
+              </div>
+            )}
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

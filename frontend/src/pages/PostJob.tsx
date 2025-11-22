@@ -1,9 +1,9 @@
-// frontend/src/pages/PostJob.tsx
 import { useForm } from "react-hook-form";
 import { createJob } from "../services/jobs.service";
 import { listSkills } from "../services/skills.service";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import React from "react";
 
 type Form = {
   title: string;
@@ -13,7 +13,153 @@ type Form = {
   category?: string;
   requiredSkills: string[];
   preferredSkills: string[];
-  verifyJob: boolean | string; // radio returns string "true"/"false"
+  verifyJob: boolean | string;
+};
+
+// Simple Rich Text Editor Component
+const RichTextEditor = ({ value, onChange, placeholder }: any) => {
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isList, setIsList] = useState(false);
+
+  const handleFormat = (type: string) => {
+    let newValue = value || '';
+    
+    switch (type) {
+      case 'bold':
+        if (isBold) {
+          newValue = newValue.replace(/\*\*(.*?)\*\*/g, '$1');
+        } else {
+          newValue = newValue + ' **bold text** ';
+        }
+        setIsBold(!isBold);
+        break;
+      case 'italic':
+        if (isItalic) {
+          newValue = newValue.replace(/\*(.*?)\*/g, '$1');
+        } else {
+          newValue = newValue + ' *italic text* ';
+        }
+        setIsItalic(!isItalic);
+        break;
+      case 'list':
+        if (isList) {
+          newValue = newValue.replace(/- /g, '');
+        } else {
+          newValue = newValue + '\n- List item 1\n- List item 2\n- List item 3';
+        }
+        setIsList(!isList);
+        break;
+      case 'code':
+        newValue = newValue + '\n```\n// Your code here\n```\n';
+        break;
+      case 'heading':
+        newValue = newValue + '\n## Heading\n';
+        break;
+    }
+    
+    onChange(newValue);
+  };
+
+  return (
+    <div className="border border-slate-300 rounded-2xl overflow-hidden focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-200 transition-all duration-200">
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 p-3 border-b border-slate-200 bg-slate-50">
+        <button
+          type="button"
+          onClick={() => handleFormat('bold')}
+          className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
+          title="Bold"
+        >
+          <span className="font-bold text-slate-700">B</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleFormat('italic')}
+          className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
+          title="Italic"
+        >
+          <span className="italic text-slate-700">I</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleFormat('list')}
+          className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
+          title="Bullet List"
+        >
+          <span className="text-slate-700">• List</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleFormat('heading')}
+          className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
+          title="Heading"
+        >
+          <span className="text-slate-700">H</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleFormat('code')}
+          className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
+          title="Code Block"
+        >
+          <span className="text-slate-700">{`</>`}</span>
+        </button>
+        <div className="flex-1 text-right">
+          <span className="text-xs text-slate-500">Supports Markdown</span>
+        </div>
+      </div>
+      
+      {/* Editor */}
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-4 py-4 min-h-48 resize-none border-none focus:ring-0 text-slate-700"
+      />
+      
+      {/* Preview */}
+      {value && (
+        <div className="border-t border-slate-200 p-4 bg-slate-50">
+          <div className="text-xs text-slate-500 mb-2 font-medium">Preview:</div>
+          <div className="text-sm text-slate-600 prose prose-sm max-w-none">
+            {value.split('\n').map((line: string, index: number) => {
+              if (line.startsWith('## ')) {
+                return <h3 key={index} className="text-lg font-bold text-slate-800 mt-2 mb-1">{line.replace('## ', '')}</h3>;
+              }
+              if (line.startsWith('- ')) {
+                return <li key={index} className="ml-4">{line.replace('- ', '')}</li>;
+              }
+              if (line.startsWith('```')) {
+                return <pre key={index} className="bg-slate-800 text-slate-100 p-2 rounded-lg text-xs mt-2"><code>{line.replace('```', '')}</code></pre>;
+              }
+              if (line.includes('**') && line.includes('**')) {
+                const parts = line.split('**');
+                return (
+                  <p key={index} className="mt-1">
+                    {parts.map((part, i) => 
+                      i % 2 === 1 ? <strong key={i} className="font-bold">{part}</strong> : part
+                    )}
+                  </p>
+                );
+              }
+              if (line.includes('*') && line.includes('*') && !line.startsWith('*')) {
+                const parts = line.split('*');
+                return (
+                  <p key={index} className="mt-1">
+                    {parts.map((part, i) => 
+                      i % 2 === 1 ? <em key={i} className="italic">{part}</em> : part
+                    )}
+                  </p>
+                );
+              }
+              return <p key={index} className="mt-1">{line}</p>;
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function PostJob() {
@@ -26,8 +172,8 @@ export default function PostJob() {
   const [busy, setBusy] = useState(false);
   const nav = useNavigate();
 
-  // watch the category field from RHF (single source of truth)
   const watchedCategory = watch("category");
+  const description = watch("description");
 
   useEffect(() => {
     (async () => {
@@ -36,11 +182,9 @@ export default function PostJob() {
         const list = (s?.skills ?? s) as any[] ?? [];
         setSkillsCatalog(list);
 
-        // derive unique categories from skills
         const cats = Array.from(new Set(list.map((it: any) => (it?.category ?? "Other"))));
 
         if (cats.length > 0) {
-          // only set if form category is empty or unset
           const current = (watchedCategory ?? "").toString();
           if (!current) {
             setValue("category", cats[0]);
@@ -50,19 +194,15 @@ export default function PostJob() {
         console.error("Could not load skills", e);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setValue]); // keep as before; we use watchedCategory in render
+  }, [setValue]);
 
-  // keep RHF values in sync with local arrays
   useEffect(() => { setValue("requiredSkills", requiredSkills); }, [requiredSkills, setValue]);
   useEffect(() => { setValue("preferredSkills", preferredSkills); }, [preferredSkills, setValue]);
 
-  // derive list of categories
   const categories = useMemo(() => {
     return Array.from(new Set(skillsCatalog.map(s => s?.category ?? "Other")));
   }, [skillsCatalog]);
 
-  // skills filtered by chosen category (use watchedCategory)
   const filtered = useMemo(() => {
     const cat = (watchedCategory && watchedCategory !== "") ? watchedCategory : (categories[0] ?? "Other");
     return skillsCatalog.filter(s => (s?.category ?? "Other") === cat);
@@ -84,10 +224,8 @@ export default function PostJob() {
   }
 
   async function onSubmit(data: Form) {
-    // normalize verifyJob (radio returns string "true"/"false")
     const verify = data.verifyJob === true || data.verifyJob === "true";
 
-    // local validation
     if (!data.title || data.title.trim().length < 3) {
       alert("Please provide a valid title (min 3 characters).");
       return;
@@ -120,7 +258,6 @@ export default function PostJob() {
 
       const createdJob = await createJob(payload);
 
-      // If user chose to verify job, redirect to payment page
       if (verify) {
         nav(`/jobs/${createdJob._id}/verify`);
       } else {
@@ -136,137 +273,234 @@ export default function PostJob() {
   }
 
   return (
-    <div className="container py-6">
-      <div className="card max-w-3xl mx-auto">
-        <h2 className="text-xl font-semibold">Post a Job</h2>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Category</label>
-            <select
-              className="input"
-              {...register("category", { required: true })}
-            >
-              <option value="">Choose a category</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            {errors.category && <div className="text-rose-600 text-xs mt-1">Category is required</div>}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-8 text-white">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                <span className="text-2xl">📝</span>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Post a New Job</h1>
+                <p className="text-violet-100 mt-2">Find the perfect worker for your project</p>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
-            <input className="input" {...register("title", { required: true, minLength: 3 })} />
-            {errors.title && <div className="text-rose-600 text-xs mt-1">Title is required (min 3 chars)</div>}
-          </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-8">
+            {/* Category & Title */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">Job Category</label>
+                <select
+                  className="w-full px-4 py-4 rounded-2xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200 bg-white"
+                  {...register("category", { required: true })}
+                >
+                  <option value="">Choose a category</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {errors.category && <div className="text-rose-600 text-sm mt-2">Category is required</div>}
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <textarea className="input h-28" {...register("description", { required: true })} />
-            {errors.description && <div className="text-rose-600 text-xs mt-1">Description is required</div>}
-          </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">Job Title</label>
+                <input 
+                  className="w-full px-4 py-4 rounded-2xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200" 
+                  {...register("title", { required: true, minLength: 3 })} 
+                  placeholder="e.g., Senior React Developer"
+                />
+                {errors.title && <div className="text-rose-600 text-sm mt-2">Title is required (min 3 chars)</div>}
+              </div>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            {/* Description */}
             <div>
-              <label className="block text-sm font-medium mb-1">Budget</label>
-              <input className="input" type="number" {...register("budget", { required: true, valueAsNumber: true })} />
-              {errors.budget && <div className="text-rose-600 text-xs mt-1">Budget is required</div>}
+              <label className="block text-sm font-semibold text-slate-700 mb-3">Job Description</label>
+              <RichTextEditor
+                value={description}
+                onChange={(value: string) => setValue("description", value)}
+                placeholder="Describe the job in detail... You can use the toolbar above to format your text with headings, lists, bold, italic, and code blocks."
+              />
+              {errors.description && <div className="text-rose-600 text-sm mt-2">Description is required</div>}
             </div>
+
+            {/* Budget */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">Budget (KES)</label>
+                <input 
+                  type="number" 
+                  className="w-full px-4 py-4 rounded-2xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200" 
+                  {...register("budget", { required: true, valueAsNumber: true })} 
+                  placeholder="5000"
+                />
+                {errors.budget && <div className="text-rose-600 text-sm mt-2">Budget is required</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">Currency</label>
+                <input 
+                  className="w-full px-4 py-4 rounded-2xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200" 
+                  {...register("currency")} 
+                  defaultValue="KES" 
+                />
+              </div>
+            </div>
+
+            {/* Required Skills */}
             <div>
-              <label className="block text-sm font-medium mb-1">Currency</label>
-              <input className="input" {...register("currency")} defaultValue="KES" />
-            </div>
-          </div>
+              <div className="flex items-center justify-between mb-4">
+                <label className="block text-sm font-semibold text-slate-700">Required Skills (select up to 5)</label>
+                <div className="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                  Selected: <span className="font-bold text-violet-600">{requiredSkills.length}</span>/5
+                </div>
+              </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium">Required skills (select up to 5)</label>
-              <div className="text-xs text-slate-500">Selected: {requiredSkills.length}</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filtered.length === 0 ? (
+                  <div className="text-sm text-slate-500 p-4 bg-slate-50 rounded-2xl text-center">
+                    No skills in this category.
+                  </div>
+                ) : (
+                  filtered.map((s: any) => {
+                    const selected = requiredSkills.includes(s.key);
+                    return (
+                      <label 
+                        key={s.key} 
+                        className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
+                          selected 
+                            ? "bg-gradient-to-r from-violet-50 to-purple-50 border-violet-400 shadow-lg" 
+                            : "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleRequired(s.key)}
+                          className="h-5 w-5 text-violet-600 rounded-lg focus:ring-violet-500"
+                        />
+                        <div className="flex-1">
+                          <span className={`font-medium ${selected ? "text-violet-700" : "text-slate-700"}`}>
+                            {s.name}
+                          </span>
+                          {s.category && (
+                            <div className="text-xs text-slate-500 mt-1">{s.category}</div>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              {requiredSkills.length === 0 && <div className="text-rose-600 text-sm mt-3">At least one required skill is needed</div>}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-2">
-              {filtered.length === 0 ? (
-                <div className="text-sm text-slate-500">No skills in this category.</div>
-              ) : (
-                filtered.map((s: any) => {
-                  const selected = requiredSkills.includes(s.key);
+            {/* Preferred Skills */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-4">Preferred Skills (optional)</label>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filtered.map((s: any) => {
+                  const selected = preferredSkills.includes(s.key);
                   return (
-                    <label key={s.key} className={`inline-flex items-center gap-2 p-2 border rounded cursor-pointer ${selected ? "bg-violet-50 border-violet-400" : "bg-white"}`}>
+                    <label 
+                      key={"p-"+s.key} 
+                      className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
+                        selected 
+                          ? "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-400 shadow-lg" 
+                          : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md"
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={selected}
-                        onChange={() => toggleRequired(s.key)}
-                        className="h-4 w-4"
+                        onChange={() => togglePreferred(s.key)}
+                        className="h-5 w-5 text-blue-600 rounded-lg focus:ring-blue-500"
                       />
-                      <span className="text-sm">{s.name}</span>
+                      <div className="flex-1">
+                        <span className={`font-medium ${selected ? "text-blue-700" : "text-slate-700"}`}>
+                          {s.name}
+                        </span>
+                        {s.category && (
+                          <div className="text-xs text-slate-500 mt-1">{s.category}</div>
+                        )}
+                      </div>
                     </label>
                   );
-                })
-              )}
+                })}
+              </div>
             </div>
-            {requiredSkills.length === 0 && <div className="text-rose-600 text-xs mt-1">At least one required skill is needed</div>}
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Preferred skills</label>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {filtered.map((s: any) => {
-                const selected = preferredSkills.includes(s.key);
-                return (
-                  <label key={"p-"+s.key} className={`inline-flex items-center gap-2 p-2 border rounded cursor-pointer ${selected ? "bg-violet-50 border-violet-400" : "bg-white"}`}>
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => togglePreferred(s.key)}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm">{s.name}</span>
-                  </label>
-                );
-              })}
+            {/* Job Verification */}
+            <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-2xl border border-slate-200">
+              <label className="block text-sm font-semibold text-slate-700 mb-4">Job Verification</label>
+              <div className="space-y-4">
+                <label className="flex items-start gap-4 p-4 bg-white rounded-2xl border-2 border-slate-200 hover:border-slate-300 cursor-pointer transition-all duration-200">
+                  <input
+                    type="radio"
+                    value="false"
+                    {...register("verifyJob")}
+                    defaultChecked
+                    className="mt-1 h-5 w-5 text-violet-600"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-slate-800">Post job without verification</div>
+                    <div className="text-sm text-slate-600 mt-1">Free - Standard visibility</div>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-400">FREE</div>
+                </label>
+                
+                <label className="flex items-start gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border-2 border-amber-200 hover:border-amber-300 cursor-pointer transition-all duration-200">
+                  <input
+                    type="radio"
+                    value="true"
+                    {...register("verifyJob")}
+                    className="mt-1 h-5 w-5 text-amber-600"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-slate-800">Verify job for better visibility</div>
+                    <div className="text-sm text-slate-600 mt-1">Verified badge and premium placement in search results</div>
+                  </div>
+                  <div className="text-2xl font-bold text-amber-600">KES 100</div>
+                </label>
+              </div>
+              <p className="text-sm text-slate-500 mt-4">
+                Verified jobs get a special badge and appear higher in search results, attracting more qualified applicants.
+              </p>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Job Verification</label>
-            <div className="space-y-2">
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="radio"
-                  value="false"
-                  {...register("verifyJob")}
-                  defaultChecked
-                />
-                <span className="text-sm">Post job without verification (Free)</span>
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="radio"
-                  value="true"
-                  {...register("verifyJob")}
-                />
-                <span className="text-sm">Verify job for better visibility (KES 100)</span>
-              </label>
+            {/* Submit Button */}
+            <div className="flex items-center justify-between pt-6 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => nav("/jobs")}
+                className="px-8 py-4 text-slate-600 font-semibold rounded-2xl border border-slate-300 hover:bg-slate-50 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              
+              <button
+                type="submit"
+                className="px-8 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                disabled={busy}
+                onClick={() => {
+                  setValue("requiredSkills", requiredSkills);
+                  setValue("preferredSkills", preferredSkills);
+                }}
+              >
+                {busy ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Creating Job...
+                  </div>
+                ) : (
+                  "Create Job →"
+                )}
+              </button>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Verified jobs get a special badge and appear higher in search results.
-            </p>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-md px-4 py-2 bg-violet-600 text-white font-medium"
-              disabled={busy}
-              onClick={() => {
-                // ensure arrays are synced right before submit
-                setValue("requiredSkills", requiredSkills);
-                setValue("preferredSkills", preferredSkills);
-              }}
-            >
-              {busy ? "Creating…" : "Create Job"}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

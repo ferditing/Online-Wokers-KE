@@ -1,14 +1,7 @@
-// frontend/src/pages/Dashboard.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
 import { Link } from "react-router-dom";
 import Card from "../components/ui/Card";
-
-/**
- * Admin Dashboard (polished)
- * - Top stats
- * - Users list with recent jobs/applications and verified status
- */
 
 type User = {
   _id: string;
@@ -77,13 +70,10 @@ export default function Dashboard() {
       setUsersLoading(true);
       setError(null);
       try {
-        // Fetch users list (admin endpoint)
         const res = await api.get(`/admin/users?limit=${limit}`);
         const fetched = res.data?.users ?? res.data ?? [];
         if (!mounted) return;
 
-        // For each user, fetch small sample of jobs/applications depending on role
-        // This will produce at most N additional requests where N = users.length (ok for <=50)
         const withRecent = await Promise.all(
           fetched.map(async (u: User) => {
             try {
@@ -93,12 +83,9 @@ export default function Dashboard() {
                 const doneCount = Array.isArray(jobs) ? jobs.filter((j: Job) => j.status === "completed").length : 0;
                 return { ...u, recentJobs: jobs, doneCount };
               } else {
-                // worker: fetch applications
                 const ar = await api.get(`/applications?worker=${u._id}&limit=6`).catch(() => ({ data: [] }));
                 const apps = ar.data?.applications ?? ar.data ?? [];
-                // count accepted/completed
                 const doneCount = Array.isArray(apps) ? apps.filter((a: Application) => a.status === "accepted" || a.status === "completed").length : 0;
-                // extract recent job titles if populated (safe)
                 const recentJobs = (Array.isArray(apps) ? apps.slice(0, 3).map(a => (a.job && a.job.title) ? a.job : a.jobId ?? a.job ?? null).filter(Boolean) : []);
                 return { ...u, recentJobs, doneCount };
               }
@@ -127,120 +114,219 @@ export default function Dashboard() {
     return users.filter(u => (u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
   }, [users, query]);
 
-  if (loading || statsLoading) return <div className="container py-8">Loading admin dashboard…</div>;
-  if (error) return <div className="container py-8 text-red-600">{error}</div>;
+  if (loading || statsLoading) return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-600 font-medium">Loading admin dashboard...</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-center">
+          <p className="font-semibold">{error}</p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Admin dashboard</h1>
-          <p className="text-sm text-slate-500 mt-1">Users, verifications and platform controls</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+              Admin Dashboard
+            </h1>
+            <p className="text-slate-600">Users, verifications and platform controls</p>
+          </div>
+          <div className="flex gap-3">
+            <Link 
+              to="/admin/verifications" 
+              className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200"
+            >
+              Review Verifications
+            </Link>
+            <Link 
+              to="/admin/payments" 
+              className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200"
+            >
+              Payments
+            </Link>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Link to="/admin/verifications" className="px-3 py-2 bg-violet-600 text-white rounded-md">Review verifications</Link>
-          <Link to="/admin/payments" className="px-3 py-2 bg-cyan-600 text-white rounded-md">Payments</Link>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          <Card className="text-center p-6">
+            <div className="w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-white text-xl">📋</span>
+            </div>
+            <div className="text-sm text-slate-500 font-medium">Pending Verifications</div>
+            <div className="text-3xl font-bold text-slate-800 mt-2">{verifications ?? "—"}</div>
+          </Card>
+
+          <Card className="text-center p-6">
+            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-green-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-white text-xl">👥</span>
+            </div>
+            <div className="text-sm text-slate-500 font-medium">Users (shown)</div>
+            <div className="text-3xl font-bold text-slate-800 mt-2">{users.length ?? "—"}</div>
+          </Card>
+
+          <Card className="text-center p-6">
+            <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-white text-xl">💰</span>
+            </div>
+            <div className="text-sm text-slate-500 font-medium">Payments Awaiting Release</div>
+            <div className="text-3xl font-bold text-slate-800 mt-2">{paymentsPending ?? "—"}</div>
+          </Card>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <div className="text-sm text-slate-500">Pending verifications</div>
-          <div className="text-2xl font-semibold mt-2">{verifications ?? "—"}</div>
+        <Card className="p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Search users by name or email..."
+                  className="pl-10 pr-4 py-3 w-80 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200"
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                  🔍
+                </div>
+              </div>
+              
+              <select 
+                value={limit} 
+                onChange={e => setLimit(Number(e.target.value))} 
+                className="px-4 py-3 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200"
+              >
+                <option value={10}>10 users</option>
+                <option value={25}>25 users</option>
+                <option value={50}>50 users</option>
+              </select>
+            </div>
+            
+            <div className="text-sm text-slate-500 font-medium">
+              💡 Click a user to open their profile / verification
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">User</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Role</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Verified</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Jobs Done</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Recent Activity</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              
+              <tbody className="divide-y divide-slate-100">
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="space-y-3">
+                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto">
+                          <span className="text-2xl text-slate-400">👥</span>
+                        </div>
+                        <p className="text-slate-600 font-medium">No users found</p>
+                        <p className="text-sm text-slate-500">Try adjusting your search criteria</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {filtered.map((u: any) => (
+                  <tr key={u._id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
+                          {u.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-800 group-hover:text-violet-700 transition-colors">
+                            {u.name}
+                          </div>
+                          <div className="text-xs text-slate-500">{u.email}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 capitalize">
+                        {u.role ?? "—"}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      {u.verified ? (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                          <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                          Not verified
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <div className="text-lg font-bold text-slate-800">{u.doneCount ?? 0}</div>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      {Array.isArray(u.recentJobs) && u.recentJobs.length > 0 ? (
+                        <div className="space-y-1 max-w-[320px]">
+                          {u.recentJobs.slice(0, 3).map((r: any, i: number) => (
+                            <div key={i} className="text-sm text-slate-700 truncate" title={r.title ?? r}>
+                              • {r.title ?? r}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-slate-400">—</span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3 justify-end">
+                        <Link 
+                          to={`/admin/user/${u._id}`} 
+                          className="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors"
+                        >
+                          View Profile
+                        </Link>
+                        <Link 
+                          to={`/admin/verifications?userId=${u._id}`} 
+                          className="text-sm font-medium text-slate-600 hover:text-slate-700 transition-colors"
+                        >
+                          Verifications
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between text-sm text-slate-500">
+            <p>Showing {filtered.length} user(s)</p>
+            <p>Use the limit dropdown to fetch more users</p>
+          </div>
         </Card>
-
-        <Card>
-          <div className="text-sm text-slate-500">Users (shown)</div>
-          <div className="text-2xl font-semibold mt-2">{users.length ?? "—"}</div>
-        </Card>
-
-        <Card>
-          <div className="text-sm text-slate-500">Payments awaiting release</div>
-          <div className="text-2xl font-semibold mt-2">{paymentsPending ?? "—"}</div>
-        </Card>
-      </div>
-
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search users by name or email"
-            className="input px-3 py-2 w-[260px]"
-          />
-          <select value={limit} onChange={e => setLimit(Number(e.target.value))} className="input px-3 py-2">
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
-        </div>
-        <div className="text-sm text-slate-500">Tip: Click a user to open their profile / verification</div>
-      </div>
-
-      <div className="bg-white border rounded shadow-sm overflow-x-auto">
-        <table className="w-full table-auto">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-4 py-3 text-sm">User</th>
-              <th className="text-left px-4 py-3 text-sm">Role</th>
-              <th className="text-left px-4 py-3 text-sm">Verified</th>
-              <th className="text-left px-4 py-3 text-sm">Jobs done</th>
-              <th className="text-left px-4 py-3 text-sm">Recent</th>
-              <th className="px-4 py-3 text-sm" />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">No users found</td>
-              </tr>
-            )}
-
-            {filtered.map((u: any) => (
-              <tr key={u._id} className="hover:bg-gray-50">
-                <td className="px-4 py-4">
-                  <div className="font-medium">{u.name}</div>
-                  <div className="text-xs text-slate-500">{u.email}</div>
-                </td>
-
-                <td className="px-4 py-4 text-sm text-slate-600">{u.role ?? "—"}</td>
-
-                <td className="px-4 py-4">
-                  {u.verified ? (
-                    <span className="inline-block px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-800">Verified</span>
-                  ) : (
-                    <span className="inline-block px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">Not verified</span>
-                  )}
-                </td>
-
-                <td className="px-4 py-4 text-sm">{u.doneCount ?? 0}</td>
-
-                <td className="px-4 py-4 text-sm">
-                  {Array.isArray(u.recentJobs) && u.recentJobs.length > 0 ? (
-                    <ul className="list-disc list-inside text-sm text-slate-600 max-w-[320px]">
-                      {u.recentJobs.slice(0, 3).map((r: any, i: number) => (
-                        <li key={i} title={r.title ?? r}>{r.title ?? r}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                  )}
-                </td>
-
-                <td className="px-4 py-4 text-right">
-                  <div className="flex items-center gap-2 justify-end">
-                    <Link to={`/admin/user/${u._id}`} className="text-sm text-violet-600 hover:underline">View profile</Link>
-                    <Link to={`/admin/verifications?userId=${u._id}`} className="text-sm text-slate-600 hover:underline">Verifications</Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-6 text-sm text-slate-500">
-        Showing {filtered.length} user(s). Use the limit dropdown to fetch more.
       </div>
     </div>
   );

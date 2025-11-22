@@ -17,7 +17,6 @@ export default function TopUpForm() {
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // When checkoutId is set, start polling STK query endpoint
     if (!checkoutId) return;
     setStatus("processing");
     setMessage("Waiting for M-Pesa confirmation. Approve the payment on your phone...");
@@ -26,21 +25,13 @@ export default function TopUpForm() {
       try {
         const res = await api.get(`/payments/mpesa/query-stk/${encodeURIComponent(checkoutId)}`);
         const data = res.data ?? res.data?.data ?? {};
-        // Many implementations return a structure; we try to detect success
-        // Adjust depending on your backend's response shape.
-        const resultCode =
-          data.Result?.ResultCode ??
-          data.ResultCode ??
-          data.resultCode ??
-          data?.result?.ResultCode ??
-          null;
+        const resultCode = data.Result?.ResultCode ?? data.ResultCode ?? data.resultCode ?? data?.result?.ResultCode ?? null;
 
         if (resultCode !== null) {
           if (Number(resultCode) === 0) {
             setStatus("paid");
             setMessage("Top-up successful — balance updated.");
             clearIntervalIfNeeded();
-            // refresh payments list or balance in parent app if needed
           } else {
             setStatus("failed");
             setMessage("Payment failed or cancelled. Please try again.");
@@ -48,17 +39,14 @@ export default function TopUpForm() {
           }
         }
       } catch (err) {
-        // don't spam errors to user; keep polling
         console.debug("STK query error (ignoring):", err);
       }
     };
 
-    // initial immediate query + interval
     doQuery();
     pollRef.current = window.setInterval(doQuery, 5000);
 
     return () => clearIntervalIfNeeded();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkoutId]);
 
   const clearIntervalIfNeeded = () => {
@@ -86,7 +74,6 @@ export default function TopUpForm() {
         phoneNumber: phoneNumber.trim()
       });
 
-      // backend returns checkoutRequestID and paymentId
       const payload = res.data ?? res.data?.data ?? {};
       const checkoutRequestID = payload.checkoutRequestID ?? payload.CheckoutRequestID ?? payload.checkoutRequestId ?? null;
       const returnedPaymentId = payload.paymentId ?? payload.payment?._id ?? null;
@@ -97,7 +84,6 @@ export default function TopUpForm() {
       if (checkoutRequestID) setCheckoutId(checkoutRequestID);
       if (returnedPaymentId) setPaymentId(returnedPaymentId);
 
-      // clear form but keep polling if we have checkout id
       setAmount("");
       setPhoneNumber("");
     } catch (err: any) {
@@ -113,47 +99,86 @@ export default function TopUpForm() {
   }, []);
 
   return (
-    <div className="container mx-auto py-8">
-      <Card>
-        <h2 className="text-xl font-semibold mb-2">Top up escrow (Employer)</h2>
-        <p className="text-sm text-slate-500 mb-4">Add funds to cover job payments. Funds will be held in escrow until release.</p>
-
-        <form onSubmit={handleTopUp} className="space-y-4">
-          <div>
-            <label className="block text-sm">Amount (KES)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
-              className="input mt-1 w-48"
-              min={50}
-              step={50}
-              placeholder="e.g. 1000"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg mx-auto">
+        <Card className="space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto">
+              <span className="text-white text-2xl">💰</span>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">Top Up Escrow</h2>
+            <p className="text-slate-600">Add funds to cover job payments</p>
           </div>
 
-          <div>
-            <label className="block text-sm">Phone Number</label>
-            <input
-              type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="input mt-1 w-48"
-              placeholder="e.g. 0712345678 or 254712345678"
-            />
-          </div>
+          <form onSubmit={handleTopUp} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Amount (KES)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200"
+                min={50}
+                step={50}
+                placeholder="e.g. 1000"
+              />
+            </div>
 
-          <div className="flex items-center gap-2">
-            <button type="submit" disabled={busy || status === "processing"} className="px-4 py-2 bg-violet-600 text-white rounded">
-              {busy ? "Processing…" : status === "processing" ? "Waiting for confirmation…" : "Top up via M-Pesa"}
-            </button>
-            <button type="button" onClick={() => navigate("/payments")} className="px-4 py-2 border rounded">Payments</button>
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200"
+                placeholder="e.g. 0712345678 or 254712345678"
+              />
+            </div>
 
-          {message && <div className={`text-sm text-slate-600 mt-2 ${status === "paid" ? "text-green-700" : status === "failed" ? "text-red-700" : ""}`}>{message}</div>}
-          {checkoutId && <div className="text-xs text-slate-500 mt-1">Checkout ID: <code>{checkoutId}</code></div>}
-        </form>
-      </Card>
+            <div className="flex items-center gap-3">
+              <button 
+                type="submit" 
+                disabled={busy || status === "processing"}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {busy ? "Processing..." : status === "processing" ? "Waiting for confirmation..." : "Top up via M-Pesa"}
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => navigate("/payments")} 
+                className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl border border-slate-200 hover:bg-slate-200 transition-colors"
+              >
+                Payments
+              </button>
+            </div>
+
+            {message && (
+              <div className={`p-4 rounded-xl text-sm font-medium ${
+                status === "paid" 
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                  : status === "failed" 
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : "bg-blue-50 text-blue-700 border border-blue-200"
+              }`}>
+                {message}
+              </div>
+            )}
+
+            {checkoutId && (
+              <div className="text-xs text-slate-500 p-3 bg-slate-50 rounded-lg">
+                Checkout ID: <code className="bg-slate-100 px-2 py-1 rounded">{checkoutId}</code>
+              </div>
+            )}
+          </form>
+
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-sm text-slate-600 text-center">
+              Funds will be held in escrow until job completion
+            </p>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
